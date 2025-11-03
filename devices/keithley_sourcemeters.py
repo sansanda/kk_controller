@@ -12,13 +12,6 @@ class Keithley2400(SourcemeterBase):
         self.write(f":OUTP {'ON' if on else 'OFF'}")
 
     def set_source_mode(self, mode: str) -> str:
-        """
-        Configura el modo de fuente (source) del SMU: corriente o tensión.
-
-        Acepta alias:
-            - corriente: 'current', 'curr', 'i'
-            - tensión:   'voltage', 'volt', 'v'
-        """
         if mode is None:
             raise ValueError("mode no puede ser None")
 
@@ -32,7 +25,14 @@ class Keithley2400(SourcemeterBase):
 
         raise ValueError("mode debe ser 'current'/'curr'/'i' o 'voltage'/'volt'/'v'")
 
-    # set_source_value SIN compliance ---
+    def get_source_mode(self) -> str:
+        resp = self.query(":SOUR:FUNC?").strip().replace('"', '').upper()
+        if resp.startswith("VOLT"):
+            return "VOLT"
+        if resp.startswith("CURR"):
+            return "CURR"
+        raise RuntimeError(f"Modo de fuente desconocido en :SOUR:FUNC? -> {resp}")
+
     def set_source_value(self, value: float) -> str:
         mode = self.get_source_mode()
         if mode == "current":
@@ -43,80 +43,62 @@ class Keithley2400(SourcemeterBase):
             raise RuntimeError(f"Modo de fuente no soportado: {mode}")
         return mode
 
-    # set_compliance ---
     def set_compliance(self, limit: float) -> str:
         mode = self.get_source_mode()
-        if mode == "current":
+        if mode == "CURR":
             # En modo corriente, la compliance es de VOLTAJE (V)
             self.write(f":SENS:VOLT:PROT {limit}")
-        elif mode == "voltage":
+        elif mode == "VOLT":
             # En modo tensión, la compliance es de CORRIENTE (A)
             self.write(f":SENS:CURR:PROT {limit}")
         else:
             raise RuntimeError(f"Modo de fuente no soportado: {mode}")
         return mode
 
-    def set_source_as_voltage(self, volts: float, compliance_i: float | None = 0.1) -> None:
-        self.write(":SOUR:FUNC VOLT")
-        self.write(f":SOUR:VOLT {volts}")
-        if compliance_i is not None:
-            self.write(f":SENS:CURR:PROT {compliance_i}")
+    def configure_data_format_elements(self, elements: [str]):
+        if not elements:
+            raise ValueError("La lista de elementos no puede estar vacía.")
 
-    def set_measure_voltage(self) -> float:
-        self.write(":FORM:ELEM VOLT")
-        return float(self.query(":READ?"))
+        # Opcional: Validar elementos permitidos
+        valid_elements = {"READ", "VOLT", "CURR", "RES", "TIME", "STAT"}
+        for el in elements:
+            if el.upper() not in valid_elements:
+                raise ValueError(f"Elemento no válido: {el}. Opciones válidas: {valid_elements}")
 
-    def set_measure_current(self) -> float:
-        self.write(":FORM:ELEM CURR")
-        return float(self.query(":READ?"))
+        # Construir la cadena SCPI
+        formatted = ",".join(f'{el.upper()}' for el in elements)
+        command = f":FORM:ELEM {formatted}"
+        self.write(command)
 
-    def _get_measure_mode(self) -> set[str]:
-        """
-        Lee :SENS:FUNC? y devuelve un set normalizado con las funciones activas:
-        {'VOLT', 'CURR', 'RES', 'FRES'} según corresponda.
-        """
-        resp = self.query(":SENS:FUNC?").strip()
-        # Respuestas típicas: "\"VOLT:DC\"" o "\"VOLT:DC\",\"CURR:DC\""
-        cleaned = resp.replace('"', '').replace("'", "")
-        parts = [p.strip().upper() for p in cleaned.split(",") if p.strip()]
-        funcs: set[str] = set()
-        for p in parts:
-            if p.startswith("VOLT"):
-                funcs.add("VOLT")
-            elif p.startswith("CURR"):
-                funcs.add("CURR")
-            elif p == "RES" or p.startswith("RES:"):  # por si algún FW devuelve variantes
-                funcs.add("RES")
-            elif p == "FRES" or p.startswith("FRES:"):
-                funcs.add("FRES")
-        return funcs
+    def set_measure_function(self, function: str):
+        mode_map = {
+            "V": "VOLT",
+            "C": "CURR",
+            "I": "CURR",
+            "R": "RES",
+            "VOLT": "VOLT",
+            "CURR": "CURR",
+            "RES": "RES"
+        }
 
-    # Métodos utilitarios comunes
-    def _get_source_mode(self) -> str:
-        """
-        Devuelve 'VOLT' o 'CURR' leyendo :SOUR:FUNC?.
-        Acepta respuestas tipo 'VOLT' o 'VOLT:DC' (según FW).
-        """
-        resp = self.query(":SOUR:FUNC?").strip().replace('"', '').upper()
-        if resp.startswith("VOLT"):
-            return "VOLT"
-        if resp.startswith("CURR"):
-            return "CURR"
-        raise RuntimeError(f"Modo de fuente desconocido en :SOUR:FUNC? -> {resp}")
+        mode_upper = function.upper()
+        if mode_upper not in mode_map:
+            raise ValueError(f"Modo de medición no válido: {function}. Opciones válidas: {list(mode_map.keys())}")
+
+        selected_mode = mode_map[mode_upper]
+        self.write(f":SENS:FUNC \"{selected_mode}\"")
+
+    def get_measure_function(self) -> str:
+        valid_functions = {"VOLT", "CURR", "RES"}
+        response = self.query(":SENS:FUNC?")
+        response = response.strip().replace('"', '').upper()
+        # Comprobar si alguno de los modos está en la cadena
+        if not any(valid_func in response.upper() for valid_func in valid_functions):
+            raise RuntimeError(f"Función de medición desconocida o no soportada: {response}")
+        return response.split(":")[0]
 
     def set_nplc(self, nplc: float) -> set[str]:
-        """
-        Ajusta el NPLC leyendo primero la(s) función(es) de medida activas en el instrumento.
-        Aplica el mismo NPLC a todas las funciones activas (útil en modo concurrente).
-        Devuelve el conjunto de funciones a las que se aplicó NPLC.
-
-        SCPI (serie 2400/2410):
-            - :SENS:VOLT:NPLC <n>
-            - :SENS:CURR:NPLC <n>
-            - :SENS:RES:NPLC  <n>     (ohmios 2 hilos)
-            - :SENS:FRES:NPLC <n>     (ohmios 4 hilos)
-        """
-        funcs = self._get_measure_mode()
+        funcs = self.get_measure_function()
         applied: set[str] = set()
 
         # Aplica a cada función reconocida
@@ -141,12 +123,7 @@ class Keithley2400(SourcemeterBase):
 
         return applied
 
-    # ---------- FRONT/REAR ----------
     def set_terminals(self, where: str = "FRONT") -> None:
-        """
-        Selecciona terminales FRONT o REAR.
-        Recomendado: salida OFF antes de conmutar.
-        """
         w = where.strip().lower()
         if w not in ("front", "rear"):
             raise ValueError("where debe ser 'front' o 'rear'")
@@ -157,51 +134,18 @@ class Keithley2400(SourcemeterBase):
             pass
         self.write(f":ROUT:TERM {'FRONT' if w == 'front' else 'REAR'}")
 
-    # ---------- Set Ranges con 'auto' o valor ----------
-    def set_measure_range(self, range_or_auto: "AUTO") -> set[str]:
-        """
-        Ajusta el rango de MEDIDA para cada función activa.
-        - Si recibe 'auto'/'AUTO' (case-insensitive): habilita AUTO RANGE.
-        - Si recibe numérico: fija un rango concreto y desactiva AUTO.
-        Devuelve el set de funciones a las que aplicó el cambio.
-
-        SCPI:
-            :SENS:<FUNC>:RANG <val>
-            :SENS:<FUNC>:RANG:AUTO ON|OFF
-        """
-        funcs = self.read_measure_functions()
-        if not funcs:
-            raise RuntimeError("No hay funciones de medida activas en :SENS:FUNC?")
-
-        # ¿'auto' o valor numérico?
-        if isinstance(range_or_auto, str) and range_or_auto.strip().lower() == "auto":
-            for f in funcs:
-                self.write(f":SENS:{f}:RANG:AUTO ON")
-            return funcs
-
-        # Intentar convertir cadenas numéricas
-        val: float
-        if isinstance(range_or_auto, str):
-            val = float(range_or_auto.strip())
+    def set_measure_range(self, value: object):
+        measure_function = self.get_measure_function()
+        command = ''
+        if isinstance(value, str) and value.upper() in {"AUTO", "A"}:
+            command = f":SENS:{measure_function}:RANG:AUTO ON"
+        elif isinstance(value, (float, int)):
+            command = f":SENS:{measure_function}:RANG {value}"
         else:
-            val = float(range_or_auto)
-
-        for f in funcs:
-            self.write(f":SENS:{f}:RANG {val}")
-            self.write(f":SENS:{f}:RANG:AUTO OFF")
-        return funcs
+            raise ValueError("El valor debe ser un número o 'AUTO'/'A'.")
+        self.write(command)
 
     def set_source_range(self, range_or_auto: "AUTO") -> str:
-        """
-        Ajusta el rango de FUENTE para la función activa (VOLT o CURR).
-        - 'auto'/'AUTO' -> habilita AUTO RANGE.
-        - numérico -> fija rango y desactiva AUTO.
-        Devuelve 'VOLT' o 'CURR' según la función de fuente afectada.
-
-        SCPI:
-            :SOUR:VOLT:RANG <val> / :SOUR:VOLT:RANG:AUTO ON|OFF
-            :SOUR:CURR:RANG <val> / :SOUR:CURR:RANG:AUTO ON|OFF
-        """
         func = self.read_source_function()  # 'VOLT' o 'CURR'
 
         if isinstance(range_or_auto, str) and range_or_auto.strip().lower() == "auto":
@@ -218,22 +162,5 @@ class Keithley2400(SourcemeterBase):
         self.write(f":SOUR:{func}:RANG:AUTO OFF")
         return func
 
-    # ---------- COMPLIANCE con autodetección de modo ----------
-    def set_compliance(self, value: float) -> None:
-        """
-        Ajusta la COMPLIANCE adecuada al modo de fuente:
-          - Si Source V -> límite de corriente (A):  :SENS:CURR:PROT <value>
-          - Si Source I -> límite de tensión (V):    :SENS:VOLT:PROT <value>
-        """
-        mode = self._get_source_mode()
-        if mode == "VOLT":
-            self.write(f":SENS:CURR:PROT {value}")
-        else:  # CURR
-            self.write(f":SENS:VOLT:PROT {value}")
-
-    # ---------- 2W / 4W ----------
     def enable_remote_sense(self, enable: bool = True) -> None:
-        """
-        Activa/desactiva Remote Sense (4 hilos) en el instrumento (afecta V/Ω).
-        """
         self.write(f":SYST:RSEN {'ON' if enable else 'OFF'}")

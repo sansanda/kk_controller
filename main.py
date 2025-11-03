@@ -1,4 +1,5 @@
 # This is a sample Python script.
+import time
 
 # Press Mayús+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
@@ -10,6 +11,7 @@ from devices import (
     KeysightE4990A,
 )
 from config import GPIB_ADDRESS_SOURCEMETER, GPIB_ADDRESS_IMPEDANCE_ANALYZER
+from utils.delays.delays import TimeDelay, ThresholdDelay
 
 
 def main():
@@ -22,12 +24,31 @@ def main():
     # --- SourceMeter ---
     smu_res = visa.open(GPIB_ADDRESS_SOURCEMETER)
     smu = Keithley2400(smu_res)
+    smu.reset()
     print("SMU:", smu.idn())
-    smu.set_nplc(1);
+    smu.configure_data_format_elements(['VOLT'])
+    smu.set_source_mode('I')
+    smu.set_measure_function('V')
+    smu.set_compliance(100)
+    smu.set_measure_range(1000)
+    smu.enable_remote_sense(False)
+    smu.set_nplc(0.01)
     smu.set_terminals("FRONT")
-    smu.set_source_mode('CURR')
-    smu.set_measure_mode('VOLT')
-    smu.set_compliance(0.1)
+
+    def callar():
+        print("me habéis llamando??")
+
+    t_delay = TimeDelay(5, callar)
+    t_delay.start()
+    print('hola')
+    t_delay.pause()
+    time.sleep(2)
+    t_delay.resume()
+
+    th_delay = ThresholdDelay(5, 'above', callar)
+    th_delay.update_value(1)
+    th_delay.start()
+
     #smu.reset()
 
     # # Ejemplo rápido: fijar 1 mA y leer V
