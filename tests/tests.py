@@ -1,6 +1,7 @@
+import threading
 import unittest
 import time
-from utils.delays.delays import TimerDelay
+from utils.delays.delays import TimeDelay, ThresholdCurrentDelay
 from utils.delays.delays import TimerDelayCopilot
 
 
@@ -12,7 +13,7 @@ class TestTimerDelay(unittest.TestCase):
             self.callback_called = True
 
         self.timeout = 1.0  # 1 segundo
-        self.delay = TimerDelay(self.timeout, callback)
+        self.delay = TimeDelay(self.timeout, callback)
 
     def test_start_and_callback(self):
         self.delay.start()
@@ -111,6 +112,81 @@ class TestTimerDelayCopilot(unittest.TestCase):
         time.sleep(self.delay.remaining() + 0.2)
         self.assertTrue(self.callback_called)
 
+# ====== Función fake de lectura de corriente ======
+def make_read_current_fake(start=10.0, step=-1.0):
+    """
+    Genera una función que simula una lectura de corriente
+    descendente linealmente.
+    Ejemplo: 10.0, 9.0, 8.0, ...
+    """
+    current = {"value": start}
+
+    def read_current():
+        val = current["value"]
+        current["value"] += step
+        return val
+
+    return read_current
+
+
+# ====== Test Suite ======
+class TestThresholdCurrentDelay(unittest.TestCase):
+
+    def test_callback_triggered_below_threshold(self):
+        """
+        Verifica que el callback se ejecuta cuando la corriente cae bajo el umbral.
+        """
+        callback_called = threading.Event()
+
+        def callback():
+            callback_called.set()
+
+        read_current_fake = make_read_current_fake(start=5.0, step=-1.0)
+        delay = ThresholdCurrentDelay(threshold=3.0, interval=0.1,
+                                      callback=callback, read_current=read_current_fake)
+        delay.start()
+
+        # Esperamos un poco más que el intervalo
+        time.sleep(0.5)
+        self.assertTrue(callback_called.is_set(),
+                        "El callback no se ejecutó al caer por debajo del umbral")
+
+    def test_callback_not_triggered_if_above_threshold(self):
+        """
+        Verifica que el callback NO se ejecuta si la corriente nunca cae bajo el umbral.
+        """
+        callback_called = threading.Event()
+
+        def callback():
+            callback_called.set()
+
+        read_current_fake = make_read_current_fake(start=10.0, step=0.0)  # siempre 10
+        delay = ThresholdCurrentDelay(threshold=5.0, interval=0.1,
+                                      callback=callback, read_current=read_current_fake)
+        delay.start()
+
+        time.sleep(0.5)
+        self.assertFalse(callback_called.is_set(),
+                         "El callback no debería haberse ejecutado")
+
+    def test_multiple_checks_until_trigger(self):
+        """
+        Verifica que check_condition se reprograma hasta que se cumple la condición.
+        """
+        callback_called = threading.Event()
+
+        def callback():
+            callback_called.set()
+
+        read_current_fake = make_read_current_fake(start=6.0, step=-1.0)
+        delay = ThresholdCurrentDelay(threshold=3.0, interval=0.1,
+                                      callback=callback, read_current=read_current_fake)
+        delay.start()
+
+        # Esperar suficiente para varias iteraciones
+        time.sleep(0.7)
+        self.assertTrue(callback_called.is_set(),
+                        "El callback debería haberse ejecutado tras varios intervalos")
 
 if __name__ == '__main__':
     unittest.main()

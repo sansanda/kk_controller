@@ -11,7 +11,7 @@ from devices import (
     KeysightE4990A,
 )
 from config import GPIB_ADDRESS_SOURCEMETER, GPIB_ADDRESS_IMPEDANCE_ANALYZER
-from utils.delays.delays import TimerDelay, ThresholdDelay
+from utils.delays.delays import TimeDelay, ThresholdCurrentDelay
 
 
 def main():
@@ -35,44 +35,7 @@ def main():
     smu.set_nplc(0.01)
     smu.set_terminals("FRONT")
 
-    def callar():
-        print("me habéis llamando??")
-        print("tiempo a la que se ha llamado a la funcion de callback", time.time())
-
-    # TEST TIMEDELAY
-    t_delay = TimerDelay(5, callar)
-    print("iniciamos timer", time.time())
-    print("elapsed time:", t_delay.elapsed(), " --- remaining time:", t_delay.remaining())
-    t_delay.start()
-    t_delay.start()  # esta llmada no debería tener efecto
-    print("iniciamos time.sleep 2s", time.time())
-    time.sleep(2)
-    print("pasado el time.sleep 2s", time.time())
-    print("elapsed time:", t_delay.elapsed(), " --- remaining time:", t_delay.remaining())
-    print("Reset timer", time.time())
-    t_delay.reset()
-    print("elapsed time:", t_delay.elapsed(), " --- remaining time:", t_delay.remaining())
-    print("start timer", time.time())
-    t_delay.start()
-    t_delay.start()  # esta llmada no debería tener efecto
-    print("iniciamos time.sleep 2s", time.time())
-    time.sleep(2)
-    print("pasado el time.sleep 2s", time.time())
-    print("elapsed time:", t_delay.elapsed(), " --- remaining time:", t_delay.remaining())
-    print("iniciamos timer.pause", time.time())
-    t_delay.pause()
-    print("Reset timer", time.time())
-    t_delay.reset()
-    print("iniciamos timer.pause", time.time())
-    t_delay.pause()  # esta llamada no debería tener efecto
-    print("iniciamos time.sleep 5s", time.time())
-    time.sleep(5)
-    print("iniciamos el time.sleep 5s", time.time())
-    print("reanudamos timer", time.time())
-    print("elapsed time:", t_delay.elapsed(), " --- remaining time:", t_delay.remaining())
-    t_delay.resume()
-
-    # smu.reset()
+    smu.reset()
 
     # # Ejemplo rápido: fijar 1 mA y leer V
     # smu.output(True)
@@ -95,7 +58,7 @@ def main():
     # print(f"[IMP] C={c:.6e} F, D={d:.6f}")
     # imp.close()
 
-    visa.close()
+    # visa.close()
 
 
 if __name__ == "__main__":
