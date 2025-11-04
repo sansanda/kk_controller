@@ -1,6 +1,6 @@
 # This is a sample Python script.
 import time
-
+import timeit
 # Press Mayús+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 
@@ -11,12 +11,12 @@ from devices import (
     KeysightE4990A,
 )
 from config import GPIB_ADDRESS_SOURCEMETER, GPIB_ADDRESS_IMPEDANCE_ANALYZER
-from utils.delays.delays import TimeDelay, ThresholdDelay
+from utils.delays.delays import TimerDelay, ThresholdDelay
 
 
 def main():
     # Configura tu backend VISA y direcciones GPIB:
-    BACKEND = "@ni"   # "@ni", "@keysight", "@py", "@sim"
+    BACKEND = "@ni"  # "@ni", "@keysight", "@py", "@sim"
 
     visa = VisaResourceManager(backend=BACKEND, timeout_ms=5000)
     print("Recursos VISA:", visa.list_resources())
@@ -37,19 +37,42 @@ def main():
 
     def callar():
         print("me habéis llamando??")
+        print("tiempo a la que se ha llamado a la funcion de callback", time.time())
 
-    t_delay = TimeDelay(5, callar)
+    # TEST TIMEDELAY
+    t_delay = TimerDelay(5, callar)
+    print("iniciamos timer", time.time())
+    print("elapsed time:", t_delay.elapsed(), " --- remaining time:", t_delay.remaining())
     t_delay.start()
-    print('hola')
-    t_delay.pause()
+    t_delay.start()  # esta llmada no debería tener efecto
+    print("iniciamos time.sleep 2s", time.time())
     time.sleep(2)
+    print("pasado el time.sleep 2s", time.time())
+    print("elapsed time:", t_delay.elapsed(), " --- remaining time:", t_delay.remaining())
+    print("Reset timer", time.time())
+    t_delay.reset()
+    print("elapsed time:", t_delay.elapsed(), " --- remaining time:", t_delay.remaining())
+    print("start timer", time.time())
+    t_delay.start()
+    t_delay.start()  # esta llmada no debería tener efecto
+    print("iniciamos time.sleep 2s", time.time())
+    time.sleep(2)
+    print("pasado el time.sleep 2s", time.time())
+    print("elapsed time:", t_delay.elapsed(), " --- remaining time:", t_delay.remaining())
+    print("iniciamos timer.pause", time.time())
+    t_delay.pause()
+    print("Reset timer", time.time())
+    t_delay.reset()
+    print("iniciamos timer.pause", time.time())
+    t_delay.pause()  # esta llamada no debería tener efecto
+    print("iniciamos time.sleep 5s", time.time())
+    time.sleep(5)
+    print("iniciamos el time.sleep 5s", time.time())
+    print("reanudamos timer", time.time())
+    print("elapsed time:", t_delay.elapsed(), " --- remaining time:", t_delay.remaining())
     t_delay.resume()
 
-    th_delay = ThresholdDelay(5, 'above', callar)
-    th_delay.update_value(1)
-    th_delay.start()
-
-    #smu.reset()
+    # smu.reset()
 
     # # Ejemplo rápido: fijar 1 mA y leer V
     # smu.output(True)
@@ -73,6 +96,7 @@ def main():
     # imp.close()
 
     visa.close()
+
 
 if __name__ == "__main__":
     main()

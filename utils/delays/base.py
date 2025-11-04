@@ -25,18 +25,16 @@ class Delay(ABC):
     def reset(self):
         """Reinicia el estado del delay."""
 
-
-class TimeDelay(threading.Timer, Delay):
     @abstractmethod
     def elapsed(self):
         """
-        Tiempo transcurrido desde que se inició el timer
+        Tiempo transcurrido desde que se inició el delay
         :return: La cantidad de segundos transcurridos.
         """
 
     @abstractmethod
     def remaining(self):
         """
-        Tiempo que falta para cumplir con el intervalo
+        Tiempo que falta para cumplir con el delay
         :return: La cantidad de segundos que faltan `para llegar al intervalo.
         """

@@ -1,53 +1,85 @@
 import threading
 import time
-from utils.delays.base import Delay, TimeDelay
+from utils.delays.base import Delay
 
 
-class MyTimeDelay(TimeDelay):
-    """
-    Delay basado en el tiempo (sin usar sleep).
-    """
-
-    def __init__(self, interval, function, args=None, kwargs=None):
-        self.interval = interval
-        self.function = function
-        self.started_at = None
-
-    def elapsed(self):
-        return time.time() - self.started_at
-
-    def remaining(self):
-        return self.interval - self.elapsed()
+class TimerDelay(Delay):
+    def __init__(self, timeout, callback):
+        self.timeout = timeout
+        self.callback = callback
+        self.timer = threading.Timer(timeout, callback)
+        self.startedTime = None # solo para iniciar
+        self.pausedTime = None  # solo para iniciar
+        self.state = 'initiated'
 
     def start(self):
-        """Inicia el delay sin bloquear el hilo principal."""
-        self.started_at = time.time()
-        threading.Timer.start(self)
+        """
+        Inicia el timer y la cuenta atras.
+        :return: None
+        """
+        if not self.state == 'started':
+            self.state = 'started'
+            self.startedTime = time.time()
+            self.timer.start()
 
     def pause(self):
-        """Pausa el temporizador sin bloquear el hilo principal."""
-        threading.Timer.cancel()
-        self.interval = self.remaining()
+        """
+        Pone el timer en modo pause conservando los valores de remaining time y elapsed time.
+        :return: None
+        """
+        if self.state == 'initiated':
+            return
+        self.timer.cancel()
+        self.pausedTime = time.time()
+        self.state = 'paused'
 
     def resume(self):
-        """Reanuda el temporizador desde donde se dejó."""
-        with self.lock:
-            if self.is_paused:
-                self.is_paused = False
-                self._start_timer()
-                print("Delay reanudado.")
-            else:
-                print("El delay no está pausado.")
+        """
+        Reanuda el timer si es que previamente se había ejecutado pause.
+        :return: None
+        """
+        if not self.state == 'paused':
+            return
+        self.timer = threading.Timer(
+            self.timeout - (self.pausedTime - self.startedTime),
+            self.callback)
+        self.timer.start()
+        self.state = 'started'
 
     def reset(self):
-        """Resetea el estado del delay."""
-        with self.lock:
-            if self.timer:
-                self.timer.cancel()
-            self.remaining_time = self.interval
-            self.is_paused = False
-            print("Delay reseteado.")
+        """
+        Reinicia el timer a los valores de constructor.
+        Ojo. El timer se detiene despues de hacer un reset y se reinician los valores de timeout, remaining y elapsed.
+        Remaining time  = timeout, elapsed time = 0s.
+        Es necesario volver a hacer un start del timer.
+        :return: None
+        """
+        self.timer.cancel()
+        self.__init__(self.timeout, self.callback)
 
+    def elapsed(self):
+        """
+        Tiempo transcurrido (en segundos) del timeout inicial.
+        Ojo, los eventos como pause hace parar la cuenta del tiempo transcurrido, como es de esperar.
+        :return: tiempo (en segundos) que queda para finalizar el timeout
+        """
+        return self.timeout - self.remaining()
+
+    def remaining(self):
+        """
+        Devuelve el tiempo (en segundos) que queda para finalizar el timeout y llamar a la función de callback
+        :return: tiempo (en segundos) que queda para finalizar el timeout
+        """
+        if not self.startedTime:
+            return self.timeout
+        else:
+            # se ha iniciado alguna vez el timer
+            if not self.pausedTime:
+                # pero nunca se ha pausado
+                return self.timeout - (time.time() - self.startedTime)
+            else:
+                # se ha iniciado y se ha pausado alguna ves el timer
+                return self.timeout - (self.pausedTime - self.startedTime)
 
 class ThresholdDelay(Delay):
     """
