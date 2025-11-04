@@ -1,6 +1,34 @@
 import threading
 import time
-from utils.delays.base import Delay
+from typing import Callable
+from enum import Enum
+from abc import ABC, abstractmethod
+
+
+class DelayState(Enum):
+    INITIATED = 'initiated'
+    STARTED = 'started'
+    PAUSED = 'paused'
+
+
+class Delay(ABC):
+    @abstractmethod
+    def start(self): pass
+
+    @abstractmethod
+    def pause(self): pass
+
+    @abstractmethod
+    def resume(self): pass
+
+    @abstractmethod
+    def reset(self): pass
+
+    @abstractmethod
+    def elapsed(self) -> float: pass
+
+    @abstractmethod
+    def remaining(self) -> float: pass
 
 
 class TimerDelay(Delay):
@@ -8,7 +36,7 @@ class TimerDelay(Delay):
         self.timeout = timeout
         self.callback = callback
         self.timer = threading.Timer(timeout, callback)
-        self.startedTime = None # solo para iniciar
+        self.startedTime = None  # solo para iniciar
         self.pausedTime = None  # solo para iniciar
         self.state = 'initiated'
 
@@ -80,6 +108,62 @@ class TimerDelay(Delay):
             else:
                 # se ha iniciado y se ha pausado alguna ves el timer
                 return self.timeout - (self.pausedTime - self.startedTime)
+
+
+class TimerDelayCopilot(Delay):
+    def __init__(self, timeout: float, callback: Callable[[], None]):
+        if timeout <= 0:
+            raise ValueError("Timeout debe ser mayor que cero.")
+        if not callable(callback):
+            raise TypeError("Callback debe ser una función callable.")
+
+        self.timeout = timeout
+        self.callback = callback
+        self.timer = threading.Timer(timeout, callback)
+
+        self.started_time: float | None = None
+        self.paused_time: float | None = None
+        self.total_paused_duration: float = 0.0
+        self.state = DelayState.INITIATED
+
+    def start(self):
+        if self.state != DelayState.STARTED:
+            self.started_time = time.time()
+            self.timer.start()
+            self.state = DelayState.STARTED
+
+    def pause(self):
+        if self.state == DelayState.STARTED:
+            self.timer.cancel()
+            self.paused_time = time.time()
+            self.state = DelayState.PAUSED
+
+    def resume(self):
+        if self.state == DelayState.PAUSED:
+            paused_duration = time.time() - self.paused_time
+            self.total_paused_duration += paused_duration
+            remaining_time = self.remaining()
+            self.timer = threading.Timer(remaining_time, self.callback)
+            self.timer.start()
+            self.state = DelayState.STARTED
+
+    def reset(self):
+        self.timer.cancel()
+        self.started_time = None
+        self.paused_time = None
+        self.total_paused_duration = 0.0
+        self.timer = threading.Timer(self.timeout, self.callback)
+        self.state = DelayState.INITIATED
+
+    def elapsed(self) -> float:
+        if self.state == DelayState.INITIATED or not self.started_time:
+            return 0.0
+        current_time = self.paused_time if self.state == DelayState.PAUSED else time.time()
+        return max(0.0, current_time - self.started_time - self.total_paused_duration)
+
+    def remaining(self) -> float:
+        return max(0.0, self.timeout - self.elapsed())
+
 
 class ThresholdDelay(Delay):
     """
