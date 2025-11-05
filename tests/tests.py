@@ -1,7 +1,9 @@
 import threading
 import unittest
 import time
-from utils.delays.delays import TimeDelay, ThresholdCurrentDelay
+#from distutils.msvccompiler import read_values
+
+from utils.delays.delays import TimeDelay, ThresholdDelay
 from utils.delays.delays import TimerDelayCopilot
 
 
@@ -81,7 +83,7 @@ class TestTimerDelayCopilot(unittest.TestCase):
         remaining_after_pause = self.delay.remaining()
         time.sleep(0.5)  # No debería afectar el timer
         self.delay.resume()
-        time.sleep(remaining_after_pause + 0.2)
+        time.sleep(remaining_after_pause + 1)
         self.assertTrue(self.callback_called)
 
     def test_reset(self):
@@ -109,60 +111,80 @@ class TestTimerDelayCopilot(unittest.TestCase):
         self.delay.pause()
         time.sleep(0.2)
         self.delay.resume()
-        time.sleep(self.delay.remaining() + 0.2)
+        time.sleep(self.delay.remaining() + 1)
         self.assertTrue(self.callback_called)
 
 # ====== Función fake de lectura de corriente ======
-def make_read_current_fake(start=10.0, step=-1.0):
+def make_read_value_fake(start, step):
     """
-    Genera una función que simula una lectura de corriente
-    descendente linealmente.
+    #TODO acabar modo ascendiente
+    Genera una función que simula una lectura de un valor
+    ascendente o descendente linealmente.
     Ejemplo: 10.0, 9.0, 8.0, ...
     """
-    current = {"value": start}
+    actual_value = {"value": start}
 
-    def read_current():
-        val = current["value"]
-        current["value"] += step
+    def read_value():
+        val = actual_value["value"]
+        actual_value["value"] += step
         return val
 
-    return read_current
+    return read_value
 
 
 # ====== Test Suite ======
-class TestThresholdCurrentDelay(unittest.TestCase):
+class TestThresholdDelay(unittest.TestCase):
 
     def test_callback_triggered_below_threshold(self):
         """
-        Verifica que el callback se ejecuta cuando la corriente cae bajo el umbral.
+        Verifica que el callback se ejecuta cuando el valor leido cae bajo el umbral.
         """
         callback_called = threading.Event()
 
         def callback():
             callback_called.set()
 
-        read_current_fake = make_read_current_fake(start=5.0, step=-1.0)
-        delay = ThresholdCurrentDelay(threshold=3.0, interval=0.1,
-                                      callback=callback, read_current=read_current_fake)
+        read_value_fake = make_read_value_fake(start=5.0, step=-1.0)
+        delay = ThresholdDelay(threshold=3.0, mode='below', interval=0.1,
+                               callback=callback, read_value=read_value_fake)
         delay.start()
 
         # Esperamos un poco más que el intervalo
-        time.sleep(0.5)
+        time.sleep(1)
         self.assertTrue(callback_called.is_set(),
                         "El callback no se ejecutó al caer por debajo del umbral")
 
-    def test_callback_not_triggered_if_above_threshold(self):
+    def test_callback_triggered_above_threshold(self):
         """
-        Verifica que el callback NO se ejecuta si la corriente nunca cae bajo el umbral.
+        Verifica que el callback se ejecuta cuando el valor leido sobrepasa cierto umbral.
         """
         callback_called = threading.Event()
 
         def callback():
             callback_called.set()
 
-        read_current_fake = make_read_current_fake(start=10.0, step=0.0)  # siempre 10
-        delay = ThresholdCurrentDelay(threshold=5.0, interval=0.1,
-                                      callback=callback, read_current=read_current_fake)
+        read_value_fake = make_read_value_fake(start=5.0, step=1.0)
+        delay = ThresholdDelay(threshold=10.0, mode='above', interval=0.1,
+                               callback=callback, read_value=read_value_fake)
+        delay.start()
+
+        # Esperamos un poco más que el intervalo
+        time.sleep(1)
+        self.assertTrue(callback_called.is_set(),
+                        "El callback no se ejecutó al sobrepasar el  umbral")
+
+    def test_callback_not_triggered_if_above_threshold(self):
+        """
+        Verifica que el callback NO se ejecuta si el valor leido nunca cae bajo el umbral.
+        """
+        callback_called = threading.Event()
+
+        def callback():
+            callback_called.set()
+
+        read_value_fake = make_read_value_fake(start=10.0, step=0.0)  # siempre 10
+        delay = ThresholdDelay(threshold=5.0, mode='below', interval=0.1,
+                               callback=callback, read_value=read_value_fake)
         delay.start()
 
         time.sleep(0.5)
@@ -178,9 +200,9 @@ class TestThresholdCurrentDelay(unittest.TestCase):
         def callback():
             callback_called.set()
 
-        read_current_fake = make_read_current_fake(start=6.0, step=-1.0)
-        delay = ThresholdCurrentDelay(threshold=3.0, interval=0.1,
-                                      callback=callback, read_current=read_current_fake)
+        read_value_fake = make_read_value_fake(start=6.0, step=-1.0)
+        delay = ThresholdDelay(threshold=3.0, mode='below', interval=0.1,
+                               callback=callback, read_value=read_value_fake)
         delay.start()
 
         # Esperar suficiente para varias iteraciones

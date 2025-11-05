@@ -166,14 +166,15 @@ class TimeDelay(Delay):
                 return self.timeout - (self.pausedTime - self.startedTime)
 
 
-class ThresholdCurrentDelay(Delay):
+class ThresholdDelay(Delay):
 
-    def __init__(self, threshold: float, interval: float, callback: Callable[[], None],
-                 read_current: Callable[[], float]):
+    def __init__(self, threshold: float, mode: str, interval: float, callback: Callable[[], None],
+                 read_value: Callable[[], float]):
         self.threshold = threshold
         self.interval = interval
+        self.mode = mode
         self.callback = callback
-        self.read_current = read_current  # inyección de dependencia
+        self.read_value = read_value  # inyección de dependencia
         self.timer = TimeDelay(self.interval, self.check_condition)
         self.started_time = None
         self.state = DelayState.INITIATED
@@ -201,8 +202,10 @@ class ThresholdCurrentDelay(Delay):
         pass
 
     def check_condition(self):
-        current = self.read_current()
-        if current < self.threshold:
+        value = self.read_value()
+        if self.mode == 'below' and value < self.threshold:
+            self.callback()
+        elif self.mode == 'above' and value > self.threshold:
             self.callback()
         else:
             self.timer.reset()

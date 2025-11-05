@@ -12,7 +12,7 @@ from devices import (
 )
 from config import GPIB_ADDRESS_SOURCEMETER, GPIB_ADDRESS_IMPEDANCE_ANALYZER
 from devices.base import AmmeterBase
-from utils.delays.delays import TimeDelay, ThresholdCurrentDelay
+from utils.delays.delays import TimeDelay, ThresholdDelay
 
 
 def main():
@@ -39,7 +39,7 @@ def main():
     #     print('Y ya estamos')
     #     smu.output(False)
     #
-    # d = ThresholdCurrentDelay(1E-5, 0.5, myfunc, smu.measure_current)
+    # d = ThresholdCurrentDelay(1E-5, 'below', 0.5, myfunc, smu.measure_current)
     # # d = TimeDelay(2, myfunc)
     # d.start()
 
