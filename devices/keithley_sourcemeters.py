@@ -1,8 +1,9 @@
 from __future__ import annotations
-from .base import SourcemeterBase
+from typing import Dict, Any
+from .base import SourcemeterBase, AmmeterBase, Modes, VoltmeterBase
 
 
-class Keithley2400(SourcemeterBase):
+class Keithley2400(SourcemeterBase, AmmeterBase, VoltmeterBase):
     """
     Implementación concreta para el Keithley 2400 (subset SCPI típico).
     Ajusta si tu firmware difiere.
@@ -25,19 +26,20 @@ class Keithley2400(SourcemeterBase):
 
         raise ValueError("mode debe ser 'current'/'curr'/'i' o 'voltage'/'volt'/'v'")
 
-    def get_source_mode(self) -> str:
-        resp = self.query(":SOUR:FUNC?").strip().replace('"', '').upper()
+    def get_source_mode(self) -> Modes:
+        resp = self.query(":SOUR:FUNC?")
+        resp = resp.strip().replace('"', '').upper()
         if resp.startswith("VOLT"):
-            return "VOLT"
+            return Modes.VOLTAGE_MODE
         if resp.startswith("CURR"):
-            return "CURR"
+            return Modes.CURRENT_MODE
         raise RuntimeError(f"Modo de fuente desconocido en :SOUR:FUNC? -> {resp}")
 
     def set_source_value(self, value: float) -> str:
         mode = self.get_source_mode()
-        if mode == "current":
+        if mode == Modes.CURRENT_MODE:
             self.write(f":SOUR:CURR {value}")
-        elif mode == "voltage":
+        elif mode == Modes.VOLTAGE_MODE:
             self.write(f":SOUR:VOLT {value}")
         else:
             raise RuntimeError(f"Modo de fuente no soportado: {mode}")
@@ -45,10 +47,10 @@ class Keithley2400(SourcemeterBase):
 
     def set_compliance(self, limit: float) -> str:
         mode = self.get_source_mode()
-        if mode == "CURR":
+        if mode == Modes.CURRENT_MODE:
             # En modo corriente, la compliance es de VOLTAJE (V)
             self.write(f":SENS:VOLT:PROT {limit}")
-        elif mode == "VOLT":
+        elif mode == Modes.VOLTAGE_MODE:
             # En modo tensión, la compliance es de CORRIENTE (A)
             self.write(f":SENS:CURR:PROT {limit}")
         else:
@@ -146,10 +148,9 @@ class Keithley2400(SourcemeterBase):
         self.write(command)
 
     def set_source_range(self, range_or_auto: "AUTO") -> str:
-        func = self.read_source_function()  # 'VOLT' o 'CURR'
-
+        func = self.get_source_mode()  # 'VOLT' o 'CURR'
         if isinstance(range_or_auto, str) and range_or_auto.strip().lower() == "auto":
-            self.write(f":SOUR:{func}:RANG:AUTO ON")
+            self.write(f":SOUR:{func.value}:RANG:AUTO ON")
             return func
 
         # Cadenas numéricas también válidas
@@ -158,9 +159,37 @@ class Keithley2400(SourcemeterBase):
         else:
             val = float(range_or_auto)
 
-        self.write(f":SOUR:{func}:RANG {val}")
-        self.write(f":SOUR:{func}:RANG:AUTO OFF")
+        self.write(f":SOUR:{func.value}:RANG {val}")
+        self.write(f":SOUR:{func.value}:RANG:AUTO OFF")
         return func
 
     def enable_remote_sense(self, enable: bool = True) -> None:
         self.write(f":SYST:RSEN {'ON' if enable else 'OFF'}")
+
+    # ********* AMMETER Y VOLTMETER INTERFACES ****************
+    def configure_ammeter(self, settings: Dict[str, Any] = None) -> None:
+        # self.set_measure_function('CURR')
+        pass
+
+    def _measure(self) -> float:
+        response = self.query(":READ?")
+        # TODO: mejorar _measure. puede dar problemas cuando el equipo está formateado para medir varios elementos
+        if isinstance(response, list):
+            response = float(response.split(',')[1])  # Tomamos el segundo valor si se trata de una list,
+        return float(response)
+
+    def measure_current(self) -> float:
+        return self._measure()
+
+    def set_ammeter_range(self, range_in_amps: Any) -> None:
+        self.set_measure_range(range_in_amps)
+
+    def measure_voltage(self) -> float:
+        return self._measure()
+
+    def set_voltmeter_range(self, range_in_volts: Any) -> None:
+        self.set_measure_range(range_in_volts)
+
+    def configure_voltmeter(self, settings: Dict[str, Any] = None) -> None:
+        # self.set_measure_function('VOLT')
+        pass

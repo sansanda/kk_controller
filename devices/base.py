@@ -1,5 +1,13 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from enum import Enum
+from typing import Dict, Any
+
+
+class Modes(Enum):
+    VOLTAGE_MODE = 'VOLT'
+    CURRENT_MODE = 'CURR'
+    AUTO_MODE = 'AUTO'
 
 
 class VisaInstrument(ABC):
@@ -230,44 +238,42 @@ class ImpedanceAnalyzerBase(VisaInstrument, ABC):
     @abstractmethod
     def fetch(self) -> tuple[float, float]: ...
 
-# class VisaInstrument(ABC):
-#     """
-#     Base genérica para instrumentos SCPI sobre VISA.
-#     Mantiene un `resource` PyVISA y helpers para SCPI.
-#     """
-#
-#     def __init__(self, resource, read_termination: str = "\n", write_termination: str = "\n"):
-#         self._res = resource
-#         self._res.read_termination = read_termination
-#         self._res.write_termination = write_termination
-#
-#     # --- Helpers SCPI comunes ---
-#     def write(self, cmd: str) -> None:
-#         self._res.write(cmd)
-#
-#     def query(self, cmd: str) -> str:
-#         return self._res.query(cmd)
-#
-#     def read(self) -> str:
-#         return self._res.read()
-#
-#     # --- Comandos SCPI estándar ---
-#     def idn(self) -> str:
-#         return self.query("*IDN?").strip()
-#
-#     def reset(self) -> None:
-#         self.write("*RST")
-#         self.write("*CLS")
-#
-#     def close(self) -> None:
-#         try:
-#             self._res.close()
-#         except Exception:
-#             pass
-#
-#     # Context manager opcional
-#     def __enter__(self):
-#         return self
-#
-#     def __exit__(self, exc_type, exc, tb):
-#         self.close()
+
+class AmmeterBase(ABC):
+    @abstractmethod
+    def measure_current(self) -> float:
+        """Returns the measured current in amperes."""
+        pass
+
+    @abstractmethod
+    def set_ammeter_range(self, range_in_amps: Any) -> None:
+        """Sets the measurement range of the ammeter."""
+        pass
+
+    @abstractmethod
+    def configure_ammeter(self, settings: Dict[str, Any] = None) -> None:
+        """
+        Configures the ammeter with a dictionary of settings.
+        Each implementation can interpret the settings as needed.
+        """
+        pass
+
+
+class VoltmeterBase(ABC):
+    @abstractmethod
+    def measure_voltage(self) -> float:
+        """Returns the measured voltage in volts."""
+        pass
+
+    @abstractmethod
+    def set_voltmeter_range(self, range_in_volts: Any) -> None:
+        """Sets the measurement range of the voltmeter."""
+        pass
+
+    @abstractmethod
+    def configure_voltmeter(self, settings: Dict[str, Any] = None) -> None:
+        """
+        Configures the voltmeter with a dictionary of settings.
+        Each implementation can interpret the settings as needed.
+        """
+        pass

@@ -3,6 +3,8 @@ import time
 from typing import Callable
 from enum import Enum
 from abc import ABC, abstractmethod
+
+
 class DelayState(Enum):
     INITIATED = 'initiated'
     STARTED = 'started'
@@ -166,7 +168,8 @@ class TimeDelay(Delay):
 
 class ThresholdCurrentDelay(Delay):
 
-    def __init__(self, threshold: float, interval: float, callback: Callable[[], None], read_current: Callable[[], float]):
+    def __init__(self, threshold: float, interval: float, callback: Callable[[], None],
+                 read_current: Callable[[], float]):
         self.threshold = threshold
         self.interval = interval
         self.callback = callback
