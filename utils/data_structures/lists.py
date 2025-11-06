@@ -1,4 +1,5 @@
 class LimitedList(list):
+    __version__ = "1.0.0"
     def __init__(self, max_length: int, *args):
         super().__init__(*args)
         self.max_length = max_length

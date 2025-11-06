@@ -2,16 +2,19 @@ import statistics
 from enum import Enum
 
 class Metrics(Enum):
+    __version__ = "1.0.0"
     LAST_VALUE = "last_value"
     MEAN = "mean"
     ST_DEV = "st_dev"
 
 class Comparator(Enum):
+    __version__ = "1.0.0"
     GREATER_THAN = "greater_than"
     LESS_THAN = "less_than"
     EQUAL_TO = "equal_to"
 
 def compute_metric(values: list, metric: Metrics):
+    __version__ = "1.0.0"
     """Calcula el valor que se usará para comparar con la referencia."""
     if not values:
         return None
@@ -42,3 +45,6 @@ def check_match(computed_metric:float, comparator:Comparator, reference_value:fl
         elif comparator == Comparator.EQUAL_TO and computed_metric == reference_value:
             trigger = True
     return trigger
+
+check_match.__version__ = "1.0.0"
+compute_metric.__version__ = "1.0.0"
