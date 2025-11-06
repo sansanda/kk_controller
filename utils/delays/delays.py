@@ -1,23 +1,17 @@
-import statistics
 import threading
 import time
 from typing import Callable
 from enum import Enum
 from abc import ABC, abstractmethod
 
+from utils.data_structures.lists import LimitedList
+from  utils.my_statistics import my_statistics
+
 
 class DelayState(Enum):
     INITIATED = 'initiated'
     STARTED = 'started'
     PAUSED = 'paused'
-
-class DelayCondition(Enum):
-    LAST_ADDED_VALUE_UNDER = "last_added_value_under"
-    LAST_ADDED_VALUE_ABOVE = "last_added_value_above"
-    MEAN_UNDER = "mean_under"
-    MEAN_ABOVE = "mean_above"
-    ST_DEV_ABOVE = "st_dev_above"
-    ST_DEV_UNDER = "st_dev_under"
 
 class Delay(ABC):
     @abstractmethod
@@ -219,23 +213,33 @@ class ThresholdDelay(Delay):
             self.timer.reset()
             self.timer.start()
 
+
 class StatisticsDelay(Delay):
 
-    def __init__(self, reference_value: float, condition: DelayCondition, interval: float, callback: Callable[[], None],
+    def __init__(self,
+                 reference_value: float,
+                 metric: my_statistics.Metrics,
+                 comparator: my_statistics.Comparator,
+                 timer_interval: float,
+                 callback: Callable[[], None],
                  read_value: Callable[[], float]):
+
         self.reference_value = reference_value
-        self.interval = interval
-        self.condition = condition
+        self.metric = metric
+        self.comparator = comparator
+        self.timer_interval = timer_interval
         self.callback = callback
         self.read_value = read_value  # inyección de dependencia
-        self.values = []
-        self.timer = TimeDelay(self.interval, self.check_condition)
+
+        self.values = LimitedList(120) # creamos una lista que va a tener siempre los 120 ultimos elementos
+        self.timer = TimeDelay(self.timer_interval, self._timer_task)
         self.started_time = None
-        self.state = DelayState.INITIATED
-        self.thread = None
-        self._stop_event = threading.Event()
+        # self.state = DelayState.INITIATED
+        # self.thread = None
+        # self._stop_event = threading.Event()
 
     def start(self):
+        self.started_time = time.time()
         self.timer.start()
 
     def pause(self):
@@ -255,31 +259,17 @@ class StatisticsDelay(Delay):
     def remaining(self) -> float:
         pass
 
-    def timer_task(self):
-        self.add_value(self.read_value())
-        self.check_condition()
 
-    def add_value(self, value):
-        self.values.append(value)
-
-    def check_condition(self):
-        if self.statistic == 'below' and value < self.threshold:
-            self.callback()
-        elif self.statistic == 'above' and value > self.threshold:
+    def _timer_task(self) -> None:
+        self.values.append(self.read_value())
+        trigger = my_statistics.check_match(my_statistics.compute_metric(self.values, self.metric),
+                                                self.comparator,
+                                                self.reference_value)
+        if trigger:
+            self.values.clear()
             self.callback()
         else:
             self.timer.reset()
             self.timer.start()
 
-    def _compute_metric(self, condition: DelayCondition):
-        """Calcula el valor que se usará para comparar con la referencia."""
-        if not self.values:
-            return None
-        if self.condition.name.startswith("LAST_ADDED"):
-            return self.values[-1]
-        elif self.condition.name.startswith("MEAN"):
-            return statistics.mean(self.values)
-        elif self.condition.name.startswith("ST_DEV"):
-            return statistics.stdev(self.values) if len(self.values) > 1 else 0.0
-        else:
-            raise ValueError(f"Unknown condition: {self.condition}")
+
