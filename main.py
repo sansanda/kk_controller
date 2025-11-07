@@ -12,7 +12,7 @@ from devices import (
 )
 from config import GPIB_ADDRESS_SOURCEMETER, GPIB_ADDRESS_IMPEDANCE_ANALYZER
 from devices.base import AmmeterBase
-from utils.delays.delays import TimeDelay, ThresholdDelay
+from utils.delays.delays import DelayFactory
 
 
 def main():
