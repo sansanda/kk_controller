@@ -4,14 +4,22 @@ from typing import Callable
 from enum import Enum
 from abc import ABC, abstractmethod
 
+from utils.data_structures.lists import LimitedList
+from  utils.my_statistics import my_statistics
+
+class DelayType(Enum):
+    __version__ = "1.0.0"
+    TIME = "time"
+    STATISTICS = "statistics"
 
 class DelayState(Enum):
+    __version__ = "1.0.0"
     INITIATED = 'initiated'
     STARTED = 'started'
     PAUSED = 'paused'
 
-
 class Delay(ABC):
+    __version__ = "1.0.0"
     @abstractmethod
     def start(self): pass
 
@@ -31,63 +39,36 @@ class Delay(ABC):
     def remaining(self) -> float: pass
 
 
-# ****************HECHO POR MICROSOFT COPILOT****************************
-class TimerDelayCopilot(Delay):
-    def __init__(self, timeout: float, callback: Callable[[], None]):
-        if timeout <= 0:
-            raise ValueError("Timeout debe ser mayor que cero.")
-        if not callable(callback):
-            raise TypeError("Callback debe ser una función callable.")
+class DelayFactory:
+    __version__ = "1.0.1"
+    """Factory Registry para crear instancias de Delay dinámicamente."""
 
-        self.timeout = timeout
-        self.callback = callback
-        self.timer = threading.Timer(timeout, callback)
+    _registry = {}  # type: dict[str, type]
 
-        self.started_time: float | None = None
-        self.paused_time: float | None = None
-        self.total_paused_duration: float = 0.0
-        self.state = DelayState.INITIATED
+    @classmethod
+    def register_delay(cls, key, delay_class):
+        """Registra una clase de delay bajo una clave única."""
+        cls._registry[key] = delay_class
 
-    def start(self):
-        if self.state != DelayState.STARTED:
-            self.started_time = time.time()
-            self.timer.start()
-            self.state = DelayState.STARTED
+    @classmethod
+    def create_delay(cls, delay_type, **kwargs):
+        """Crea una instancia del delay solicitado."""
+        key = delay_type.value if isinstance(delay_type, DelayType) else delay_type
+        delay_class = cls._registry.get(key)
 
-    def pause(self):
-        if self.state == DelayState.STARTED:
-            self.timer.cancel()
-            self.paused_time = time.time()
-            self.state = DelayState.PAUSED
+        if not delay_class:
+            raise ValueError(f"No hay delay registrado para '{key}'")
 
-    def resume(self):
-        if self.state == DelayState.PAUSED:
-            paused_duration = time.time() - self.paused_time
-            self.total_paused_duration += paused_duration
-            remaining_time = self.remaining()
-            self.timer = threading.Timer(remaining_time, self.callback)
-            self.timer.start()
-            self.state = DelayState.STARTED
+        return delay_class(**kwargs)
 
-    def reset(self):
-        self.timer.cancel()
-        self.started_time = None
-        self.paused_time = None
-        self.total_paused_duration = 0.0
-        self.timer = threading.Timer(self.timeout, self.callback)
-        self.state = DelayState.INITIATED
-
-    def elapsed(self) -> float:
-        if self.state == DelayState.INITIATED or not self.started_time:
-            return 0.0
-        current_time = self.paused_time if self.state == DelayState.PAUSED else time.time()
-        return max(0.0, current_time - self.started_time - self.total_paused_duration)
-
-    def remaining(self) -> float:
-        return max(0.0, self.timeout - self.elapsed())
+    @classmethod
+    def available_delays(cls):
+        """Devuelve una lista de tipos registrados."""
+        return list(cls._registry.keys())
 
 
 class TimeDelay(Delay):
+    __version__ = "1.0.1"
     def __init__(self, timeout, callback):
         self.timeout = timeout
         self.callback = callback
@@ -166,44 +147,152 @@ class TimeDelay(Delay):
                 return self.timeout - (self.pausedTime - self.startedTime)
 
 
-class ThresholdCurrentDelay(Delay):
+class StatisticsDelay(Delay):
+    __version__ = "1.0.1"
+    """
+    Clase que implementa un delay basado en estadísticas sobre valores leídos periódicamente.
 
-    def __init__(self, threshold: float, interval: float, callback: Callable[[], None],
-                 read_current: Callable[[], float]):
-        self.threshold = threshold
-        self.interval = interval
+    Cada cierto intervalo de tiempo (timer_interval), se lee un valor usando la función
+    inyectada `read_value()`. Se calcula una métrica (último valor, media o desviación estándar)
+    y se compara con un valor de referencia usando un comparador (mayor, menor, igual).
+
+    Si la condición se cumple, se ejecuta el callback y opcionalmente se limpia la lista de valores.
+
+    La lista de valores mantiene como máximo los últimos 120 elementos usando `LimitedList`.
+    Todas las operaciones sobre la lista son thread-safe gracias a un lock interno.
+    """
+
+    def __init__(self,
+                 reference_value: float,
+                 metric: my_statistics.Metrics,
+                 comparator: my_statistics.Comparator,
+                 timer_interval: float,
+                 callback: Callable[[], None],
+                 read_value: Callable[[], float]):
+        """
+        Inicializa el delay estadístico.
+
+        Args:
+            reference_value (float): Valor de referencia para la comparación.
+            metric (my_statistics.Metrics): Métrica a calcular sobre los valores (LAST_VALUE, MEAN, ST_DEV).
+            comparator (my_statistics.Comparator): Comparador que determina cuándo disparar el callback.
+            timer_interval (float): Intervalo en segundos entre lecturas de valores.
+            callback (Callable[[], None]): Función a ejecutar cuando se cumpla la condición.
+            read_value (Callable[[], float]): Función que devuelve un valor numérico a añadir a la lista.
+        """
+        self.reference_value = reference_value
+        self.metric = metric
+        self.comparator = comparator
+        self.timer_interval = timer_interval
         self.callback = callback
-        self.read_current = read_current  # inyección de dependencia
-        self.timer = TimeDelay(self.interval, self.check_condition)
+        self.read_value = read_value  # inyección de dependencia
+
+        self.values = LimitedList(120) # lista de valores con longitud máxima 120
+        self.timer = TimeDelay(self.timer_interval, self._timer_task)
         self.started_time = None
-        self.state = DelayState.INITIATED
-        self.thread = None
-        self._stop_event = threading.Event()
+
+        # Lock para operaciones thread-safe sobre la lista
+        self._values_lock = threading.Lock()
 
     def start(self):
+        """Inicia el timer y comienza a leer valores periódicamente."""
+        self.started_time = time.time()
         self.timer.start()
 
     def pause(self):
+        """Pausa el timer conservando el tiempo transcurrido."""
         self.timer.pause()
 
     def resume(self):
+        """Reanuda el timer después de una pausa."""
         self.timer.resume()
 
     def reset(self):
+        """Reinicia el timer y borra el tiempo transcurrido del estado actual."""
         self.timer.reset()
 
     def elapsed(self) -> float:
+        """
+        Devuelve el tiempo transcurrido desde que se llamó a `start()`.
+
+        Returns:
+            float: Tiempo en segundos transcurrido desde `start()`. 0 si no se ha iniciado.
+        """
         if not self.started_time:
             return 0.0
         return time.time() - self.started_time
 
     def remaining(self) -> float:
+        """
+        Devuelve el tiempo restante hasta que se dispare el timer.
+
+        Returns:
+            float: Tiempo en segundos restante. None si no implementado.
+        """
         pass
 
-    def check_condition(self):
-        current = self.read_current()
-        if current < self.threshold:
+    def _timer_task(self) -> None:
+        """
+        Función interna llamada por el timer en cada tick.
+        - Añade un valor a la lista de forma thread-safe.
+        - Calcula la métrica seleccionada.
+        - Comprueba si la condición se cumple usando el comparador.
+        - Ejecuta el callback si se cumple y limpia la lista de valores.
+        - Reinicia el timer si no se cumple la condición.
+        """
+        with self._values_lock:
+            self.values.append(self.read_value())
+            trigger = my_statistics.check_match(
+                my_statistics.compute_metric(self.values, self.metric),
+                self.comparator,
+                self.reference_value
+            )
+
+        if trigger:
+            self.values.clear()
             self.callback()
         else:
             self.timer.reset()
             self.timer.start()
+
+    def clear_values(self) -> None:
+        """
+        Limpia la lista de valores de manera segura (thread-safe).
+
+        Esto puede usarse para reiniciar manualmente la ventana de valores.
+        """
+        with self._values_lock:
+            self.values.clear()
+
+# 🧪 Ejemplo de registro dinámico
+#
+# Supón que creas un nuevo tipo de delay:
+#
+# class CustomDelay:
+#     def __init__(self, message):
+#         self.message = message
+#
+#     def start(self):
+#         print(f"Starting custom delay: {self.message}")
+#
+#
+# Puedes registrarlo en cualquier momento:
+#
+# from utils.delays.delays import DelayFactory
+#
+# DelayFactory.register_delay("custom", CustomDelay)
+#
+# d = DelayFactory.create_delay("custom", message="hola mundo")
+# d.start()
+#
+#
+# Salida:
+#
+# Starting custom delay: hola mundo
+
+# ✅ Ventajas de este enfoque
+# Característica	Beneficio
+# Registro centralizado	Evita modificar la factoría para nuevos tipos
+# Flexible	Puedes registrar clases dinámicamente en tests, plugins, etc.
+# Limpio	Los tests no importan clases concretas
+# Extensible	Perfecto para proyectos donde se añadan nuevos delays
