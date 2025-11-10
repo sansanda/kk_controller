@@ -5,12 +5,14 @@ from enum import Enum
 from abc import ABC, abstractmethod
 
 from utils.data_structures.lists import LimitedList
-from  utils.my_statistics import my_statistics
+from utils.my_statistics import my_statistics
+
 
 class DelayType(Enum):
     __version__ = "1.0.0"
     TIME = "time"
     STATISTICS = "statistics"
+
 
 class DelayState(Enum):
     __version__ = "1.0.0"
@@ -18,8 +20,10 @@ class DelayState(Enum):
     STARTED = 'started'
     PAUSED = 'paused'
 
+
 class Delay(ABC):
     __version__ = "1.0.0"
+
     @abstractmethod
     def start(self): pass
 
@@ -69,6 +73,7 @@ class DelayFactory:
 
 class TimeDelay(Delay):
     __version__ = "1.0.1"
+
     def __init__(self, timeout, callback):
         self.timeout = timeout
         self.callback = callback
@@ -146,6 +151,103 @@ class TimeDelay(Delay):
                 # se ha iniciado y se ha pausado alguna ves el timer
                 return self.timeout - (self.pausedTime - self.startedTime)
 
+    def __str__(self):
+        callback_name = getattr(self.callback, '__name__', repr(self.callback))
+        return (f"TimeDelay(timeout={self.timeout:.2f}s, state='{self.state}', "
+                f"elapsed={self.elapsed():.2f}s, remaining={self.remaining():.2f}s, "
+                f"callback={callback_name})")
+
+
+class SyncrhonTimeDelay(Delay):
+    __version__ = "1.0.0"
+
+    def __init__(self, timeout):
+        self.timeout = timeout
+        self.timer = threading.Timer(timeout, self.callback)
+        self.startedTime = None  # solo para iniciar
+        self.pausedTime = None  # solo para iniciar
+        self.state = 'initiated'
+
+    def start(self):
+        """
+        Inicia el timer y la cuenta atras.
+        :return: None
+        """
+        if not self.state == 'started':
+            self.state = 'started'
+            self.startedTime = time.time()
+            self.timer.start()
+
+    def pause(self):
+        """
+        Pone el timer en modo pause conservando los valores de remaining time y elapsed time.
+        :return: None
+        """
+        if self.state == 'initiated':
+            return
+        self.timer.cancel()
+        self.pausedTime = time.time()
+        self.state = 'paused'
+
+    def resume(self):
+        """
+        Reanuda el timer si es que previamente se había ejecutado pause.
+        :return: None
+        """
+        if not self.state == 'paused':
+            return
+        self.timer = threading.Timer(
+            self.timeout - (self.pausedTime - self.startedTime),
+            self.callback)
+        self.timer.start()
+        self.state = 'started'
+
+    def reset(self):
+        """
+        Reinicia el timer a los valores de constructor.
+        Ojo. El timer se detiene despues de hacer un reset y se reinician los valores de timeout, remaining y elapsed.
+        Remaining time  = timeout, elapsed time = 0s.
+        Es necesario volver a hacer un start del timer.
+        :return: None
+        """
+        self.timer.cancel()
+        self.__init__(self.timeout)
+
+    def elapsed(self):
+        """
+        Tiempo transcurrido (en segundos) del timeout inicial.
+        Ojo, los eventos como pause hace parar la cuenta del tiempo transcurrido, como es de esperar.
+        :return: tiempo (en segundos) que queda para finalizar el timeout
+        """
+        return self.timeout - self.remaining()
+
+    def remaining(self):
+        """
+        Devuelve el tiempo (en segundos) que queda para finalizar el timeout y llamar a la función de callback
+        :return: tiempo (en segundos) que queda para finalizar el timeout
+        """
+        if not self.startedTime:
+            return self.timeout
+        else:
+            # se ha iniciado alguna vez el timer
+            if not self.pausedTime:
+                # pero nunca se ha pausado
+                return self.timeout - (time.time() - self.startedTime)
+            else:
+                # se ha iniciado y se ha pausado alguna ves el timer
+                return self.timeout - (self.pausedTime - self.startedTime)
+
+    def callback(self):
+        while True:
+            if self.state == 'done':
+                return
+
+    def __str__(self):
+        callback_name = getattr(self.callback, '__name__', repr(self.callback))
+        return (f"TimeDelay(timeout={self.timeout:.2f}s, state='{self.state}', "
+                f"elapsed={self.elapsed():.2f}s, remaining={self.remaining():.2f}s, "
+                f"callback={callback_name})")
+
 
 class StatisticsDelay(Delay):
     __version__ = "1.0.1"
@@ -187,7 +289,7 @@ class StatisticsDelay(Delay):
         self.callback = callback
         self.read_value = read_value  # inyección de dependencia
 
-        self.values = LimitedList(120) # lista de valores con longitud máxima 120
+        self.values = LimitedList(120)  # lista de valores con longitud máxima 120
         self.timer = TimeDelay(self.timer_interval, self._timer_task)
         self.started_time = None
 

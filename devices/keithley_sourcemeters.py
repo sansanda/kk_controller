@@ -80,7 +80,10 @@ class Keithley2400(SourcemeterBase, AmmeterBase, VoltmeterBase):
             "R": "RES",
             "VOLT": "VOLT",
             "CURR": "CURR",
-            "RES": "RES"
+            "RES": "RES",
+            "VOLTAGE": "VOLT",
+            "CURRENT": "CURR",
+            "RESISTANCE": "RES"
         }
 
         mode_upper = function.upper()

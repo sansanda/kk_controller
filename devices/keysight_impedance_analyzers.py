@@ -4,6 +4,7 @@ from .base import ImpedanceAnalyzerBase
 
 class KeysightE4990A(ImpedanceAnalyzerBase):
     """
+    TODO: Clase inservible. Por lo pronto
     Implementación concreta para Keysight E4980A (subset SCPI).
     """
 

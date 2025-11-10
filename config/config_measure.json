@@ -15,8 +15,8 @@
       "remote_sense_valid_options": ["y", "n"],
       "format_elements": ["VOLT", "CURR"],
       "format_elements_valid_options": ["VOLT", "CURR"],
-      "measure_function": "dc_voltage",
-      "measure_function_valid_options": ["dc_voltage", "dc_current", "resistance", "four_wire_resistance"],
+      "measure_function": "voltage",
+      "measure_function_valid_options": ["voltage", "current", "resistance"],
       "measure_range": "auto",
       "measure_range_valid_options": {
         "dc_voltage": ["auto", 0.1, 1, 10, 100],
@@ -24,7 +24,7 @@
         "resistance": ["auto", 10, 100, 1000, 10000],
         "four_wire_resistance": ["auto", 10, 100, 1000, 10000]
       },
-      "nplc": 1,
+      "nplc": 10,
       "nplc_valid_options": [0.01, 0.1, 1, 10, 100],
       "front_rear": "front",
       "front_rear_valid_options": ["front", "rear"]
@@ -44,10 +44,10 @@
     "number_of_points": 11,
     "compliance": 0.1,
     "compliance_valid_options": [0.001, 0.01, 0.05, 0.1, 0.2, 0.5, 1.0],
-    "selected_delay": "statistics",
+    "selected_delay": "time",
     "selected_delay_valid_options": ["time", "statistics"],
     "time_delay": {
-      "delay_value": 0.5
+      "delay_value": 5
     },
     "statistics_delay": {
       "metric": "st_dev",
