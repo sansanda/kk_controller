@@ -30,6 +30,7 @@ def main():
     imp_res = visa.open(GPIB_ADDRESS_IMPEDANCE_ANALYZER)
     imp_analyzer = KeysightE4990A(imp_res)
     configure_impedance_analyzer(imp_analyzer)
+
     time.sleep(1)
     imp_analyzer.trigger_single()
     print(imp_analyzer.fetch())
