@@ -1,20 +1,15 @@
 # This is a sample Python script.
 import csv
-import time
 import json
-import timeit
 from typing import Dict, Any
-
-import numpy as np
-import struct
-from utils.delays.delays import DelayFactory, TimeDelay, StatisticsDelay, Delay
+from datetime import datetime
+from utils.delays.delays import DelayFactory, Delay
 from devices import (
     VisaResourceManager,
     Keithley2400,
     KeysightE4990A,
 )
 
-from datetime import datetime
 
 # Press Mayús+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
