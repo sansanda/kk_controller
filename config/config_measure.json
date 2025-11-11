@@ -76,5 +76,12 @@
       "statistic_function": "measure_sweep_voltage",
       "statistic_function_valid_options": ["measure_sweep_voltage", "measure_sweep_current"]
     }
+  },
+  "Results": {
+    "File": {
+      "name": "measure",
+      "header": "v(V),z(Ohms),phi(º),cs(Farads)"
+    }
+
   }
 }

@@ -1,4 +1,5 @@
 # This is a sample Python script.
+import csv
 import time
 import json
 import timeit
@@ -12,6 +13,9 @@ from devices import (
     Keithley2400,
     KeysightE4990A,
 )
+
+from datetime import datetime
+
 # Press Mayús+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 
@@ -48,6 +52,7 @@ def main_sdm_loop(sweep_config: dict,
                   source_meter: SourcemeterBase,
                   imp_analyzer: KeysightE4990A,
                   delay,
+                  output_file_name,
                   log: bool = True):
     # Generar puntos de barrido
     start = sweep_config["start_voltage"]
@@ -64,7 +69,15 @@ def main_sdm_loop(sweep_config: dict,
         delay.start()
         while not delay.is_done():
             pass
-        print(imp_analyzer.measure())
+        z, phi, cs = imp_analyzer.measure()
+        z_mean = sum(z) / len(z)
+        phi_mean = sum(phi) / len(phi)
+        cs_mean = sum(cs) / len(cs)
+
+        # Guardar fila en el CSV
+        with open(output_file_name, mode="a", newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow([f"{v:.3f}", f"{z_mean:.5e}", f"{phi_mean:.5e}", f"{cs_mean:.5e}"])
 
 
 def main():
@@ -77,6 +90,7 @@ def main():
     impedance_analyzer_config = config["Instruments"]["ImpedanceAnalyzer"]
     sweep_config = config["Sweep"]
     delay_config = config["Delays"]
+    output_file_config = config["Results"]
 
     # Configura tu backend VISA
     visa = VisaResourceManager(backend=visa_config["backend"],
@@ -94,8 +108,17 @@ def main():
 
     delay = get_delay(delay_config, callback_function=None)
 
+    # init output file
+    # Abrir fichero y escribir cabecera
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_name = f"{output_file_config['File']['name']}_{timestamp}.csv"
+
+    with open(file_name, mode="w", newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow([h.strip() for h in output_file_config["File"]["header"].split(",")])
+
     # Ejecutar el bucle principal
-    main_sdm_loop(sweep_config, smu, imp_analyzer, delay)
+    main_sdm_loop(sweep_config, smu, imp_analyzer, delay, file_name)
 
 
 if __name__ == "__main__":
