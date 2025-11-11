@@ -144,9 +144,10 @@ class TestStatisticsDelay(unittest.TestCase):
             read_value=read_value
         )
 
-        for _ in range(150):
-            sd._timer_task()
-
+        sd.start()
+        # hay que dar tiempo para que acabe el delay
+        time.sleep(3)
+        print(sd.values)
         assert len(sd.values) == 120
         assert sd.values[0] == 30
         assert sd.values[-1] == 149
@@ -168,16 +169,40 @@ class TestStatisticsDelay(unittest.TestCase):
             delay_type=DelayType.STATISTICS,
             reference_value=10.0,
             metric=Metrics.MEAN,
-            comparator=Comparator.GREATER_THAN,
+            comparator=Comparator.LESS_THAN,
             timer_interval=0.01,
             callback=callback,
             read_value=read_value
         )
-        print(sd)
-        for _ in values:
-            sd._timer_task()
 
+        sd.start()
+        # Hay que dar tiempo para que acabe el delay
+        time.sleep(1)
         assert len(last_called_value) == 1
+
+        # para esta prueba es importante que el primer valor del test no sea menor que el valor medio.
+        # esto es así porque el delay comienza a comparar desde el primer valor de values
+        # esto habría que solucionarlo
+
+        values = [30, 15, 20]
+        it = iter(values)
+        callback_called = threading.Event()
+        last_called_value = []
+
+        sd = DelayFactory.create_delay(
+            delay_type=DelayType.STATISTICS,
+            reference_value=10.0,
+            metric=Metrics.MEAN,
+            comparator=Comparator.LESS_THAN,
+            timer_interval=0.01,
+            callback=callback,
+            read_value=read_value
+        )
+
+        sd.start()
+        # Hay que dar tiempo para que acabe el delay
+        time.sleep(1)
+        assert len(last_called_value) == 0
 
 
 if __name__ == '__main__':

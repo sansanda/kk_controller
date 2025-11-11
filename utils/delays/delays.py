@@ -193,6 +193,7 @@ class StatisticsDelay(Delay):
     Todas las operaciones sobre la lista son thread-safe gracias a un lock interno.
     """
 
+    #TODO: para el caso de metricas como stdev, mean hay que asegurar que el delay comparé solo a partir de n numero, para evitar un match prematuro
     def __init__(self,
                  reference_value: float,
                  metric: my_statistics.Metrics,
