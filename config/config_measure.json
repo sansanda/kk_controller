@@ -11,7 +11,7 @@
         "voltage": ["auto", 0.1, 1, 10, 100],
         "current": ["auto", 0.001, 0.01, 0.1, 1]
       },
-      "remote_sense": "y",
+      "remote_sense": "n",
       "remote_sense_valid_options": ["y", "n"],
       "format_elements": ["VOLT", "CURR"],
       "format_elements_valid_options": ["VOLT", "CURR"],
@@ -47,7 +47,7 @@
     "selected_delay": "time",
     "selected_delay_valid_options": ["time", "statistics"],
     "time_delay": {
-      "delay_value": 5
+      "delay_value": 1
     },
     "statistics_delay": {
       "metric": "st_dev",

@@ -167,7 +167,8 @@ def main_sdm_loop(config: dict, keithley: Keithley2400, log: bool = True):
 
         print("Iniciando delay...")
         delay.start()
-
+        while not delay.is_done():
+            pass
 
 def main():
     # Configura tu backend VISA y direcciones GPIB:

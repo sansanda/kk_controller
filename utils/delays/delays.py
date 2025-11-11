@@ -77,7 +77,7 @@ class DelayFactory:
 
 
 class TimeDelay(Delay):
-    __version__ = "1.0.3"
+    __version__ = "1.0.4"
 
     def __init__(self, timeout=1.0, callback=None):
         self.timeout = timeout
@@ -92,11 +92,14 @@ class TimeDelay(Delay):
         Inicia el timer y la cuenta atras.
         :return: None
         """
-        if self.state == 'initiated' or self.state == 'paused':
+        if self.state == 'initiated' or self.state == 'paused' or self.state == 'done':
             if self.state == 'paused':
                 self.timer = threading.Timer(
                     self.timeout - (self.pausedTime - self.startedTime),
                     self._internal_callback)
+            if self.state == 'done':
+                # si el timer ha finalizado entonces debemos rehacerlo antes de volver a hacer un start
+                self.reset()
             self.state = 'started'
             self.startedTime = time.time()
             self.timer.start()
