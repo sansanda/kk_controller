@@ -1,1 +1,15 @@
+# Carpetas de bytecode de Python
 __pycache__/
+**/__pycache__/
+
+# Archivos compilados
+*.py[cod]
+*.pyo
+
+# Entornos virtuales
+venv/
+.env/
+
+# Archivos temporales de IDEs
+.vscode/
+.idea/
