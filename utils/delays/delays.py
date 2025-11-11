@@ -10,8 +10,8 @@ from utils.my_statistics import my_statistics
 
 class DelayType(Enum):
     __version__ = "1.0.0"
-    TIME = "time"
-    STATISTICS = "statistics"
+    TIME = "TimeDelay"
+    STATISTICS = "StatisticsDelay"
 
 
 class DelayState(Enum):

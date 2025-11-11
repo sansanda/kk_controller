@@ -9,6 +9,35 @@ class Keithley2400(SourcemeterBase, AmmeterBase, VoltmeterBase):
     Ajusta si tu firmware difiere.
     """
 
+    def __init__(self, resource, config: Dict[str, Any], read_termination: str = "\n", write_termination: str = "\n"):
+        """
+        Inicializa el instrumento usando un diccionario de configuración.
+
+        :param config: Diccionario con parámetros como:
+                       {
+                           "resource_name": "GPIB0::24::INSTR",
+                           "timeout": 5000,
+                           "init_output": False,
+                           "source_mode": "current",
+                           "source_value": 0.0,
+                           "compliance": 10.0
+                       }
+        """
+        super().__init__(resource)
+        self.setup(config)
+
+    def setup(self, config: Dict[str, Any]):
+        """
+        Configura el instrumento según los parámetros ya cargados en el init.
+        """
+        self.set_source_mode(config["source_mode"])
+        self.set_compliance(config["compliance"])
+        self.set_source_range(config["source_range"])
+        self.set_measure_function(config["measure_function"])
+        self.set_nplc(config["nplc"])
+        self.set_terminals(config["front_rear"])
+        self.enable_remote_sense(config["remote_sense"].lower() == "y")
+
     def output(self, on: bool) -> None:
         self.write(f":OUTP {'ON' if on else 'OFF'}")
 
