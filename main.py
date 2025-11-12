@@ -56,10 +56,10 @@ def main_sdm_loop(sweep_config: dict,
     voltages = [start + i * (stop - start) / (num_points - 1) for i in range(num_points)]
 
     # Bucle principal SDM
+    source_meter.output(True)
     for v in voltages:
         print(f"\nAplicando voltaje: {v:.3f} V")
         source_meter.set_source_value(v)
-
         print("Iniciando delay...")
         delay.start()
         while not delay.is_done():
@@ -74,6 +74,7 @@ def main_sdm_loop(sweep_config: dict,
             writer = csv.writer(csvfile)
             writer.writerow([f"{v:.3f}", f"{z_mean:.5e}", f"{phi_mean:.5e}", f"{cs_mean:.5e}"])
 
+    source_meter.output(False)
 
 def main():
     # carga del JSON para la configuracion

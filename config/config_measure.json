@@ -46,26 +46,18 @@
       "nplc_valid_options": [0.01, 0.1, 1, 10, 100],
       "front_rear": "front",
       "front_rear_valid_options": ["front", "rear"]
-    },
-    "Impedance_Analyzer": {
-      "model": "E4990A",
-      "gpib_addr": "18",
-      "timeout_ms": 10000,
-      "frequency": 1000,
-      "mode": "voltage",
-      "mode_valid_options": ["voltage", "current"]
     }
   },
   "Sweep": {
     "start_voltage": 0.0,
-    "stop_voltage": 5.0,
-    "number_of_points": 11
+    "stop_voltage": 200.0,
+    "number_of_points": 51
   },
   "Delays": {
     "selected_delay": "TimeDelay",
     "selected_delay_valid_options": ["TimeDelay", "StatisticsDelay"],
     "time_delay": {
-      "delay_value": 1
+      "delay_value": 2
     },
     "statistics_delay": {
       "metric": "st_dev",

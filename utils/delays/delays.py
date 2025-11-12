@@ -82,6 +82,8 @@ class TimeDelay(Delay):
     def __init__(self, timeout=1.0, callback=None, n_shots=1):
         self.timeout = timeout
         self.callback = callback
+        if not n_shots or n_shots < 0:
+            self.n_shots = n_shots
         self.timer = threading.Timer(timeout, self._internal_callback)
         self.startedTime = None  # solo para iniciar
         self.pausedTime = None  # solo para iniciar
