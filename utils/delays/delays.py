@@ -78,105 +78,214 @@ class DelayFactory:
 
 class TimeDelay(Delay):
     __version__ = "1.0.5"
+    """
+    Implementa un temporizador configurable con soporte para pausa, reanudación,
+    reinicio y ejecución repetida mediante un número definido de disparos (n_shots).
 
+    Esta clase encapsula un `threading.Timer` y añade control de estado, permitiendo
+    iniciar, pausar, reanudar o reiniciar el temporizador sin perder el tiempo restante.
+    Puede ejecutar una función de callback al finalizar cada disparo o solo al completar
+    el último, dependiendo del flujo configurado.
+
+    Estados posibles:
+        - 'initiated' : El temporizador ha sido creado, pero no ha comenzado.
+        - 'started'   : El temporizador está en ejecución.
+        - 'paused'    : El temporizador está pausado.
+        - 'done'      : El temporizador ha completado todos los disparos.
+
+    Atributos:
+        timeout (float): Tiempo (en segundos) de cada disparo del temporizador.
+        callback (Callable | None): Función que se ejecuta al finalizar el último disparo.
+        n_shots (int): Número total de disparos del temporizador. Si es <= 0, se fuerza a 1.
+        remaining_shots (int): Disparos restantes antes de finalizar el ciclo completo.
+        timer (threading.Timer): Instancia interna del temporizador.
+        startedTime (float | None): Marca temporal del inicio del último disparo.
+        pausedTime (float | None): Marca temporal del momento en que se pausó.
+        state (str): Estado actual del temporizador.
+
+    Métodos principales:
+        start()  -> None:
+            Inicia el temporizador o lo reanuda si estaba pausado.
+            Si el temporizador estaba en estado 'done', se reinicia antes de iniciar.
+
+        pause()  -> None:
+            Pausa el temporizador, conservando el tiempo restante y transcurrido.
+
+        resume() -> None:
+            Reanuda la cuenta regresiva desde el punto donde se pausó.
+
+        reset()  -> None:
+            Restablece el temporizador a su estado inicial, con el número total
+            de disparos reiniciado. El temporizador queda detenido.
+
+        is_done() -> bool:
+            Devuelve True si el temporizador ha completado todos los disparos.
+
+        elapsed() -> float:
+            Devuelve el tiempo total transcurrido desde el inicio, en segundos.
+
+        remaining() -> float:
+            Devuelve el tiempo restante (en segundos) hasta completar todos los disparos.
+
+    Ejemplo:
+        >>> import time
+        >>> def fin():
+        ...     print("¡Finalizado!")
+        ...
+        >>> t = TimeDelay(timeout=2.0, callback=fin, n_shots=3)
+        >>> t.start()
+        >>> time.sleep(3)
+        >>> t.pause()
+        >>> print("Pausado:", t.remaining())
+        >>> t.resume()
+        >>> # Tras 6 segundos aprox. se imprimirá "¡Finalizado!"
+    """
     def __init__(self, timeout=1.0, callback=None, n_shots=1):
+        """
+        Inicializa el temporizador.
+
+        Args:
+            timeout (float): Tiempo de cada disparo en segundos.
+            callback (Callable | None): Función que se ejecuta al finalizar el último disparo.
+            n_shots (int): Número total de disparos del temporizador.
+        """
         self.timeout = timeout
         self.callback = callback
-        if not n_shots or n_shots < 0:
-            self.n_shots = n_shots
+        self.n_shots = n_shots
+        if not self.n_shots or self.n_shots < 0:
+            self.n_shots = 1
+        self.remaining_shots = self.n_shots
         self.timer = threading.Timer(timeout, self._internal_callback)
         self.startedTime = None  # solo para iniciar
         self.pausedTime = None  # solo para iniciar
-        self.state = 'initiated'
+        self.state = DelayState.INITIATED
 
     def start(self):
         """
-        Inicia el timer y la cuenta atras.
-        :return: None
+        Inicia el temporizador o lo reanuda si estaba pausado.
+        Si el temporizador estaba en estado 'done', se reinicia antes de iniciar.
         """
-        if self.state == 'initiated' or self.state == 'paused' or self.state == 'done':
-            if self.state == 'paused':
+        if self.state == DelayState.STARTED: return
+        if self.state in (DelayState.INITIATED, DelayState.PAUSED, DelayState.DONE):
+            if self.state == DelayState.PAUSED:
                 self.timer = threading.Timer(
                     self.timeout - (self.pausedTime - self.startedTime),
                     self._internal_callback)
-            if self.state == 'done':
+            if self.state == DelayState.DONE:
                 # si el timer ha finalizado entonces debemos rehacerlo antes de volver a hacer un start
                 self.reset()
-            self.state = 'started'
+            self.state = DelayState.STARTED
             self.startedTime = time.time()
             self.timer.start()
 
     def pause(self):
         """
-        Pone el timer en modo pause conservando los valores de remaining time y elapsed time.
-        :return: None
+        Pausa el temporizador, conservando el tiempo restante y transcurrido.
         """
-        if not self.state == 'started':
-            return
-        self.state = 'paused'
+        if not self.state == DelayState.STARTED: return
+        self.state = DelayState.PAUSED
         self.timer.cancel()
         self.pausedTime = time.time()
 
 
     def resume(self):
         """
-        Reanuda el timer si es que previamente se había ejecutado pause.
-        :return: None
+        Reanuda el temporizador desde donde se pausó.
         """
-        if not self.state == 'paused':
+        if not self.state == DelayState.PAUSED:
             return
         self.start()
 
 
     def reset(self):
         """
-        Reinicia el timer a los valores de constructor.
-        Ojo. El timer se detiene despues de hacer un reset y se reinician los valores de timeout, remaining y elapsed.
-        Remaining time  = timeout, elapsed time = 0s.
-        Es necesario volver a hacer un start del timer.
-        :return: None
+        Reinicia el temporizador a los valores iniciales.
+
+        Restablece remaining_shots al número original de disparos y rearma
+        el temporizador. No inicia automáticamente; es necesario llamar a start().
         """
-        self.timer.cancel()
-        self.__init__(self.timeout, self.callback)
+        self.remaining_shots = self.n_shots
+        self._rearm()  # Rearma el temporizador
 
     def is_done(self) -> bool:
-        return self.state == 'done'
+        """
+        Comprueba si el temporizador ha completado todos los disparos.
+
+        Returns:
+            bool: True si el temporizador está en estado 'done'.
+        """
+        return self.state == DelayState.DONE
 
     def elapsed(self):
         """
-        Tiempo transcurrido (en segundos) del timeout inicial.
-        Ojo, los eventos como pause hace parar la cuenta del tiempo transcurrido, como es de esperar.
-        :return: tiempo (en segundos) que queda para finalizar el timeout
+        Devuelve el tiempo total transcurrido desde el inicio del temporizador
+        hasta el momento actual, considerando pausas.
+
+        Returns:
+            float: Tiempo transcurrido en segundos.
         """
-        return self.timeout - self.remaining()
+        return self.timeout * self.n_shots - self.remaining()
 
     def remaining(self):
         """
-        Devuelve el tiempo (en segundos) que queda para finalizar el timeout y llamar a la función de callback
-        :return: tiempo (en segundos) que queda para finalizar el timeout
+        Devuelve el tiempo restante hasta completar todos los disparos.
+
+        Returns:
+            float: Tiempo restante en segundos.
         """
         if not self.startedTime:
-            return self.timeout
+            return self.timeout * self.n_shots
         else:
             # se ha iniciado alguna vez el timer
             if not self.pausedTime:
                 # pero nunca se ha pausado
-                return self.timeout - (time.time() - self.startedTime)
+                # (self.timeout - (time.time() - self.startedTime) es el tiempo que queda de un timeout
+                return self.timeout * self.remaining_shots + (self.timeout - (time.time() - self.startedTime))
             else:
                 # se ha iniciado y se ha pausado alguna vez el timer
-                return self.timeout - (self.pausedTime - self.startedTime)
+                return self.timeout * self.remaining_shots + (self.timeout - (self.pausedTime - self.startedTime))
 
     def _internal_callback(self):
-        self.state = 'done'
-        if self.callback:
+        """
+        Callback interno llamado por threading.Timer al expirar cada disparo.
+
+        Reduce remaining_shots y, si no ha terminado, rearma y reinicia el timer.
+        Llama a la función callback del usuario si se completan todos los disparos.
+        """
+        self.remaining_shots = self.remaining_shots - 1
+        if self.remaining_shots == 0:
+            self.state = DelayState.DONE
+        else:
+            # aqui, rearmar el timer y hacer un start
+            self._rearm()
+            self.start()
+        # if self.state = 'done'
+        if self.state == DelayState.DONE and self.callback:
             self.callback()
 
-    def __str__(self):
-        callback_name = getattr(self.callback, '__name__', repr(self.callback))
-        return (f"TimeDelay(timeout={self.timeout:.2f}s, state='{self.state}', "
-                f"elapsed={self.elapsed():.2f}s, remaining={self.remaining():.2f}s, "
-                f"callback={callback_name})")
+    def _rearm(self):
+        """
+        Rearma el temporizador sin reinicializar todo el objeto.
 
+        Cancela cualquier timer activo y prepara uno nuevo.
+        """
+        if self.timer.is_alive(): self.timer.cancel()
+        self.timer = threading.Timer(self.timeout, self._internal_callback)
+        self.startedTime = None
+        self.pausedTime = None
+        self.state = DelayState.INITIATED
+
+    def __str__(self):
+        """
+        Representación en cadena del objeto, mostrando estado, tiempos y callback.
+
+        Returns:
+            str: Información resumida del temporizador.
+        """
+        callback_name = getattr(self.callback, '__name__', repr(self.callback))
+        return (f"TimeDelay(timeout={self.timeout:.2f}s, state='{self.state.value}', "
+                f"elapsed={self.elapsed():.2f}s, remaining={self.remaining():.2f}s, "
+                f"callback={callback_name}, n_shots={self.n_shots})")
 
 
 class StatisticsDelay(Delay):
@@ -223,7 +332,7 @@ class StatisticsDelay(Delay):
         self.read_value = read_value  # inyección de dependencia
 
         self.values = None  # lista de valores con longitud máxima 120
-        self.timer = TimeDelay(self.timer_interval, self._timer_task)
+        self.timer = TimeDelay(self.timer_interval, self._timer_task, )
         self.started_time = None
         self.paused_time = None
         self.elapsed_time = 0.0

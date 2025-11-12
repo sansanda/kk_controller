@@ -2,7 +2,7 @@ import threading
 import unittest
 import time
 
-from utils.delays.delays import DelayFactory, DelayType, TimeDelay  # 👈 usamos la factoría
+from utils.delays.delays import DelayFactory, DelayType, TimeDelay, DelayState  # 👈 usamos la factoría
 from utils.my_statistics.my_statistics import Metrics, Comparator
 
 
@@ -17,7 +17,7 @@ class TestTimeDelay(unittest.TestCase):
 
     def test_initial_state(self):
         td = TimeDelay(timeout=1, callback=self.callback)
-        self.assertEqual(td.state, 'initiated')
+        self.assertEqual(td.state, DelayState.INITIATED)
         self.assertFalse(td.is_done())
         self.assertAlmostEqual(td.remaining(), 1, delta=0.01)
         self.assertAlmostEqual(td.elapsed(), 0, delta=0.01)
@@ -25,7 +25,7 @@ class TestTimeDelay(unittest.TestCase):
     def test_start_and_done(self):
         td = TimeDelay(timeout=0.2, callback=self.callback)
         td.start()
-        self.assertEqual(td.state, 'started')
+        self.assertEqual(td.state, DelayState.STARTED)
         time.sleep(0.3)  # Espera que termine
         self.assertTrue(td.is_done())
         self.assertTrue(self.callback_called)
@@ -33,7 +33,7 @@ class TestTimeDelay(unittest.TestCase):
     def test_start_and_done_with_callback_none(self):
         td = TimeDelay(timeout=0.2, callback=None)
         td.start()
-        self.assertEqual(td.state, 'started')
+        self.assertEqual(td.state, DelayState.STARTED)
         time.sleep(0.3)  # Espera que termine
         self.assertTrue(td.is_done())
 
@@ -43,22 +43,25 @@ class TestTimeDelay(unittest.TestCase):
         time.sleep(0.2)
         td.pause()
         paused_remaining = td.remaining()
-        self.assertEqual(td.state, 'paused')
+        self.assertEqual(td.state, DelayState.PAUSED)
         time.sleep(0.2)  # No debería afectar al tiempo restante
         self.assertAlmostEqual(td.remaining(), paused_remaining, delta=0.01)
         td.resume()
-        self.assertEqual(td.state, 'started')
+        self.assertEqual(td.state, DelayState.STARTED)
         time.sleep(paused_remaining + 0.1)
         self.assertTrue(td.is_done())
         self.assertTrue(self.callback_called)
 
     def test_reset(self):
-        td = TimeDelay(timeout=0.2, callback=self.callback)
+        n_shots = 2
+        timeout = 0.2
+        td = TimeDelay(timeout=0.2, callback=self.callback, n_shots=n_shots)
         td.start()
         td.reset()
-        self.assertEqual(td.state, 'initiated')
+        self.assertEqual(td.state, DelayState.INITIATED)
         self.assertFalse(td.is_done())
-        self.assertAlmostEqual(td.remaining(), 0.2, delta=0.01)
+        self.assertAlmostEqual(td.remaining(), n_shots*timeout, delta=0.01)
+        self.assertEqual(td.n_shots, n_shots)
 
     def test_elapsed_and_remaining_consistency(self):
         td = TimeDelay(timeout=0.3, callback=self.callback)
@@ -71,6 +74,7 @@ class TestTimeDelay(unittest.TestCase):
     def test_str_output(self):
         td = TimeDelay(timeout=1, callback=self.callback)
         s = str(td)
+        print(s)
         self.assertIn("TimeDelay(timeout=1.00s", s)
         self.assertIn("state='initiated'", s)
         self.assertIn("callback=callback", s)
