@@ -77,9 +77,9 @@ class DelayFactory:
 
 
 class TimeDelay(Delay):
-    __version__ = "1.0.4"
+    __version__ = "1.0.5"
 
-    def __init__(self, timeout=1.0, callback=None):
+    def __init__(self, timeout=1.0, callback=None, n_shots=1):
         self.timeout = timeout
         self.callback = callback
         self.timer = threading.Timer(timeout, self._internal_callback)
