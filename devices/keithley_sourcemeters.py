@@ -1,9 +1,9 @@
 from __future__ import annotations
 from typing import Dict, Any
-from .base import SourcemeterBase, AmmeterBase, Modes, VoltmeterBase
+from .base import SourcemeterBase, Modes
 
 
-class Keithley2400(SourcemeterBase, AmmeterBase, VoltmeterBase):
+class Keithley2400(SourcemeterBase):
     """
     Implementación concreta para el Keithley 2400 (subset SCPI típico).
     Ajusta si tu firmware difiere.
@@ -26,7 +26,7 @@ class Keithley2400(SourcemeterBase, AmmeterBase, VoltmeterBase):
         super().__init__(resource)
         self.setup(config)
 
-    def setup(self, config: Dict[str, Any]):
+    def setup_sourcemeter(self, config: Dict[str, Any]):
         """
         Configura el instrumento según los parámetros ya cargados en el init.
         """
@@ -64,7 +64,7 @@ class Keithley2400(SourcemeterBase, AmmeterBase, VoltmeterBase):
             return Modes.CURRENT_MODE
         raise RuntimeError(f"Modo de fuente desconocido en :SOUR:FUNC? -> {resp}")
 
-    def set_source_value(self, value: float) -> str:
+    def set_source_value(self, value: float) -> None:
         mode = self.get_source_mode()
         if mode == Modes.CURRENT_MODE:
             self.write(f":SOUR:CURR {value}")
@@ -72,9 +72,8 @@ class Keithley2400(SourcemeterBase, AmmeterBase, VoltmeterBase):
             self.write(f":SOUR:VOLT {value}")
         else:
             raise RuntimeError(f"Modo de fuente no soportado: {mode}")
-        return mode
 
-    def set_compliance(self, limit: float) -> str:
+    def set_compliance(self, limit: float) -> None:
         mode = self.get_source_mode()
         if mode == Modes.CURRENT_MODE:
             # En modo corriente, la compliance es de VOLTAJE (V)
@@ -84,7 +83,6 @@ class Keithley2400(SourcemeterBase, AmmeterBase, VoltmeterBase):
             self.write(f":SENS:CURR:PROT {limit}")
         else:
             raise RuntimeError(f"Modo de fuente no soportado: {mode}")
-        return mode
 
     def configure_data_format_elements(self, elements: [str]):
         if not elements:
@@ -100,36 +98,6 @@ class Keithley2400(SourcemeterBase, AmmeterBase, VoltmeterBase):
         formatted = ",".join(f'{el.upper()}' for el in elements)
         command = f":FORM:ELEM {formatted}"
         self.write(command)
-
-    def set_measure_function(self, function: str):
-        mode_map = {
-            "V": "VOLT",
-            "C": "CURR",
-            "I": "CURR",
-            "R": "RES",
-            "VOLT": "VOLT",
-            "CURR": "CURR",
-            "RES": "RES",
-            "VOLTAGE": "VOLT",
-            "CURRENT": "CURR",
-            "RESISTANCE": "RES"
-        }
-
-        mode_upper = function.upper()
-        if mode_upper not in mode_map:
-            raise ValueError(f"Modo de medición no válido: {function}. Opciones válidas: {list(mode_map.keys())}")
-
-        selected_mode = mode_map[mode_upper]
-        self.write(f":SENS:FUNC \"{selected_mode}\"")
-
-    def get_measure_function(self) -> str:
-        valid_functions = {"VOLT", "CURR", "RES"}
-        response = self.query(":SENS:FUNC?")
-        response = response.strip().replace('"', '').upper()
-        # Comprobar si alguno de los modos está en la cadena
-        if not any(valid_func in response.upper() for valid_func in valid_functions):
-            raise RuntimeError(f"Función de medición desconocida o no soportada: {response}")
-        return response.split(":")[0]
 
     def set_nplc(self, nplc: float) -> set[str]:
         funcs = self.get_measure_function()
@@ -168,18 +136,8 @@ class Keithley2400(SourcemeterBase, AmmeterBase, VoltmeterBase):
             pass
         self.write(f":ROUT:TERM {'FRONT' if w == 'front' else 'REAR'}")
 
-    def set_measure_range(self, value: object):
-        measure_function = self.get_measure_function()
-        command = ''
-        if isinstance(value, str) and value.upper() in {"AUTO", "A"}:
-            command = f":SENS:{measure_function}:RANG:AUTO ON"
-        elif isinstance(value, (float, int)):
-            command = f":SENS:{measure_function}:RANG {value}"
-        else:
-            raise ValueError("El valor debe ser un número o 'AUTO'/'A'.")
-        self.write(command)
 
-    def set_source_range(self, range_or_auto: "AUTO") -> str:
+    def set_source_range(self, range_or_auto: str = "AUTO") -> str:
         func = self.get_source_mode()  # 'VOLT' o 'CURR'
         if isinstance(range_or_auto, str) and range_or_auto.strip().lower() == "auto":
             self.write(f":SOUR:{func.value}:RANG:AUTO ON")
@@ -198,30 +156,57 @@ class Keithley2400(SourcemeterBase, AmmeterBase, VoltmeterBase):
     def enable_remote_sense(self, enable: bool = True) -> None:
         self.write(f":SYST:RSEN {'ON' if enable else 'OFF'}")
 
-    # ********* AMMETER Y VOLTMETER INTERFACES ****************
-    def configure_ammeter(self, settings: Dict[str, Any] = None) -> None:
+
+    # ********* MULTIMETER INTERFACE ****************
+    def configure_multimeter(self, settings: Dict[str, Any] = None) -> None:
         # self.set_measure_function('CURR')
         pass
 
-    def _measure(self) -> float:
+    def measure(self) -> float:
         response = self.query(":READ?")
         # TODO: mejorar _measure. puede dar problemas cuando el equipo está formateado para medir varios elementos
         if isinstance(response, list):
             response = float(response.split(',')[1])  # Tomamos el segundo valor si se trata de una list,
         return float(response)
 
-    def measure_current(self) -> float:
-        return self._measure()
+    def set_measure_range(self, _range: Any):
+        measure_function = self.get_measure_function()
+        command = ''
+        if isinstance(_range, str) and _range.upper() in {"AUTO", "A"}:
+            command = f":SENS:{measure_function}:RANG:AUTO ON"
+        elif isinstance(_range, (float, int)):
+            command = f":SENS:{measure_function}:RANG {_range}"
+        else:
+            raise ValueError("El valor debe ser un número o 'AUTO'/'A'.")
+        self.write(command)
 
-    def set_ammeter_range(self, range_in_amps: Any) -> None:
-        self.set_measure_range(range_in_amps)
+    def set_measure_function(self, function: str):
+        mode_map = {
+            "V": "VOLT",
+            "C": "CURR",
+            "I": "CURR",
+            "R": "RES",
+            "VOLT": "VOLT",
+            "CURR": "CURR",
+            "RES": "RES",
+            "VOLTAGE": "VOLT",
+            "CURRENT": "CURR",
+            "RESISTANCE": "RES"
+        }
 
-    def measure_voltage(self) -> float:
-        return self._measure()
+        mode_upper = function.upper()
+        if mode_upper not in mode_map:
+            raise ValueError(f"Modo de medición no válido: {function}. Opciones válidas: {list(mode_map.keys())}")
 
-    def set_voltmeter_range(self, range_in_volts: Any) -> None:
-        self.set_measure_range(range_in_volts)
+        selected_mode = mode_map[mode_upper]
+        self.write(f":SENS:FUNC \"{selected_mode}\"")
 
-    def configure_voltmeter(self, settings: Dict[str, Any] = None) -> None:
-        # self.set_measure_function('VOLT')
-        pass
+    def get_measure_function(self) -> str:
+        valid_functions = {"VOLT", "CURR", "RES"}
+        response = self.query(":SENS:FUNC?")
+        response = response.strip().replace('"', '').upper()
+        # Comprobar si alguno de los modos está en la cadena
+        if not any(valid_func in response.upper() for valid_func in valid_functions):
+            raise RuntimeError(f"Función de medición desconocida o no soportada: {response}")
+        return response.split(":")[0]
+

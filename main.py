@@ -16,7 +16,7 @@ from devices import (
 
 
 from config import GPIB_ADDRESS_SOURCEMETER, GPIB_ADDRESS_IMPEDANCE_ANALYZER
-from devices.base import AmmeterBase, SourcemeterBase
+from devices.base import SourcemeterBase
 
 
 def get_delay(delay_config: Dict['str', Any], callback_function=None) -> Delay:
