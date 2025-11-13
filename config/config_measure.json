@@ -14,7 +14,7 @@
       "f_start": 99.9E+3,
       "f_stop": 100.1E+3,
       "n_points": 3,
-      "vac_level": 0.5
+      "vac_level": 0.05
     },
     "SourceMeter": {
       "model": "Keithley_2410",
@@ -27,7 +27,7 @@
         "voltage": ["auto", 0.1, 1, 10, 100],
         "current": ["auto", 0.001, 0.01, 0.1, 1]
       },
-      "compliance": 0.1,
+      "compliance": 0.001,
       "compliance_valid_options": [0.001, 0.01, 0.05, 0.1, 0.2, 0.5, 1.0],
       "remote_sense": "n",
       "remote_sense_valid_options": ["y", "n"],
@@ -51,7 +51,7 @@
   "Sweep": {
     "start_voltage": 0.0,
     "stop_voltage": 200.0,
-    "number_of_points": 51
+    "number_of_points": 101
   },
   "Delays": {
     "selected_delay": "TimeDelay",

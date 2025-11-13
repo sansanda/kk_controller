@@ -140,6 +140,7 @@ class TimeDelay(Delay):
         >>> t.resume()
         >>> # Tras 6 segundos aprox. se imprimirá "¡Finalizado!"
     """
+
     def __init__(self, timeout=1.0, callback=None, n_shots=1):
         """
         Inicializa el temporizador.
@@ -187,7 +188,6 @@ class TimeDelay(Delay):
         self.timer.cancel()
         self.pausedTime = time.time()
 
-
     def resume(self):
         """
         Reanuda el temporizador desde donde se pausó.
@@ -195,7 +195,6 @@ class TimeDelay(Delay):
         if not self.state == DelayState.PAUSED:
             return
         self.start()
-
 
     def reset(self):
         """
@@ -304,7 +303,7 @@ class StatisticsDelay(Delay):
     Todas las operaciones sobre la lista son thread-safe gracias a un lock interno.
     """
 
-    #TODO: para el caso de metricas como stdev, mean hay que asegurar que el delay comparé solo a partir de n numero, para evitar un match prematuro
+    # TODO: para el caso de metricas como stdev, mean hay que asegurar que el delay comparé solo a partir de n numero, para evitar un match prematuro
     def __init__(self,
                  reference_value: float,
                  metric: my_statistics.Metrics,
@@ -358,7 +357,6 @@ class StatisticsDelay(Delay):
             self.state = 'started'
             self.started_time = time.time()
 
-
     def pause(self):
         """
         Pone el timer en modo pause conservando los valores de elapsed time.
@@ -389,12 +387,12 @@ class StatisticsDelay(Delay):
         """
         self.timer.reset()
         self.__init__(self.reference_value,
-                     self.metric,
-                     self.comparator,
-                     self.timer_interval,
-                     self.read_value,
-                     self.callback
-                     )
+                      self.metric,
+                      self.comparator,
+                      self.timer_interval,
+                      self.read_value,
+                      self.callback
+                      )
 
     def is_done(self) -> bool:
         return self.state == 'done'
@@ -462,7 +460,6 @@ class StatisticsDelay(Delay):
                 f"  Elapsed time    : {self.elapsed_time:.3f}s\n"
                 f"  Values count    : {len(self.values) if self.values else 0}\n"
                 f"  Callback defined: {'Yes' if self.callback else 'No'}")
-
 
 # 🧪 Ejemplo de registro dinámico
 #
