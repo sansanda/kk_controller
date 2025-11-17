@@ -20,57 +20,6 @@ class Instrument(ABC):
         pass
 
 
-class VisaInstrument(Instrument):
-    """
-    Base genérica para instrumentos SCPI sobre VISA.
-    Mantiene un `resource` PyVISA y helpers para SCPI.
-    """
-
-    def __init__(self, resource, read_termination: str = "\n", write_termination: str = "\n"):
-        self._res = resource
-        self._res.read_termination = read_termination
-        self._res.write_termination = write_termination
-
-    # --- Helpers SCPI comunes ---
-    @abstractmethod
-    def write(self, cmd: str) -> None:
-        self._res.write(cmd)
-
-    @abstractmethod
-    def query(self, cmd: str) -> str:
-        return self._res.query(cmd)
-
-    @abstractmethod
-    def read(self) -> str:
-        return self._res.read()
-
-    # --- Comandos SCPI estándar ---
-    @abstractmethod
-    def idn(self) -> str:
-        return self.query("*IDN?").strip()
-
-    @abstractmethod
-    def reset(self) -> None:
-        self.write("*RST")
-        self.write("*CLS")
-
-    @abstractmethod
-    def close(self) -> None:
-        try:
-            self._res.close()
-        except Exception:
-            pass
-
-    # Context manager opcional
-    @abstractmethod
-    def __enter__(self):
-        return self
-
-    @abstractmethod
-    def __exit__(self, exc_type, exc, tb):
-        self.close()
-
-
 class Multimeter(Instrument):
 
     @abstractmethod
@@ -82,6 +31,9 @@ class Multimeter(Instrument):
     def set_measure_range(self, _range: Any) -> None:
         """Sets the measurement range."""
         pass
+
+    @abstractmethod
+    def get_measure_range(self) -> float:...
 
     @abstractmethod
     def set_measure_function(self, function: str) -> None:
@@ -97,13 +49,27 @@ class Multimeter(Instrument):
         """
         pass
 
+    @abstractmethod
+    def set_nplc(self, nplc: float) -> None:
+        """
+
+        :param nplc:
+        :return:
+        """
+
+    @abstractmethod
+    def get_nplc(self) -> float:
+        """
+
+        :return:
+        """
+
 
 class Source(Instrument):
 
     @abstractmethod
     def set_source_range(self, range_or_auto: str = "AUTO") -> str:
         """
-
         :param range_or_auto:
         :return:
         """
@@ -160,21 +126,6 @@ class Source(Instrument):
         :return:
         """
 
-    @abstractmethod
-    def set_nplc(self, nplc: float) -> None:
-        """
-
-        :param nplc:
-        :return:
-        """
-
-    @abstractmethod
-    def get_nplc(self) -> float:
-        """
-
-        :return:
-        """
-
     def set_terminals(self, where: str = "FRONT") -> None:
         """
 
@@ -198,15 +149,7 @@ class Source(Instrument):
         """
 
 
-class SourcemeterBase(VisaInstrument, Source, Multimeter):
-    """
-    Interfaz abstracta de un SourceMeter (SMU).
-    Implementa el contrato común, independientemente del modelo.
-    """
-    pass
-
-
-class ImpedanceAnalyzerBase(VisaInstrument):
+class ImpedanceAnalyzerBase(Instrument):
     """
     Interfaz abstracta de un Analizador de Impedancias.
     """

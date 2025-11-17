@@ -1,19 +1,20 @@
 from __future__ import annotations
 from typing import Dict, Any
-from .base import SourcemeterBase, Modes
+
+from devices import Source, Multimeter, InstrumentsPort, Modes
 
 
-class Keithley2400(SourcemeterBase):
+class Keithley2400(Source, Multimeter):
     """
     Implementación concreta para el Keithley 2400 (subset SCPI típico).
     Ajusta si tu firmware difiere.
     """
 
-    def __init__(self, resource, config: Dict[str, Any], read_termination: str = "\n", write_termination: str = "\n"):
+    def __init__(self, resource, settings: Dict[str, Any], read_termination: str = "\n", write_termination: str = "\n"):
         """
         Inicializa el instrumento usando un diccionario de configuración.
 
-        :param config: Diccionario con parámetros como:
+        :param settings: Diccionario con parámetros como:
                        {
                            "resource_name": "GPIB0::24::INSTR",
                            "timeout": 5000,
@@ -23,8 +24,8 @@ class Keithley2400(SourcemeterBase):
                            "compliance": 10.0
                        }
         """
-        super().__init__(resource)
-        self.setup(config)
+        self._port = InstrumentsPort(resource, settings)
+        self.setup(settings)
 
     def setup(self, settings: Dict[str, Any] = None) -> None:
         """
@@ -38,51 +39,6 @@ class Keithley2400(SourcemeterBase):
         self.set_terminals(settings["front_rear"])
         self.enable_remote_sense(settings["remote_sense"].lower() == "y")
 
-    def output(self, on: bool) -> None:
-        self.write(f":OUTP {'ON' if on else 'OFF'}")
-
-    def set_source_mode(self, mode: str) -> str:
-        if mode is None:
-            raise ValueError("mode no puede ser None")
-
-        m = mode.strip().lower()
-        if m in ("current", "curr", "i"):
-            self.write(":SOUR:FUNC CURR")
-            return "current"
-        if m in ("voltage", "volt", "v"):
-            self.write(":SOUR:FUNC VOLT")
-            return "voltage"
-
-        raise ValueError("mode debe ser 'current'/'curr'/'i' o 'voltage'/'volt'/'v'")
-
-    def get_source_mode(self) -> Modes:
-        resp = self.query(":SOUR:FUNC?")
-        resp = resp.strip().replace('"', '').upper()
-        if resp.startswith("VOLT"):
-            return Modes.VOLTAGE_MODE
-        if resp.startswith("CURR"):
-            return Modes.CURRENT_MODE
-        raise RuntimeError(f"Modo de fuente desconocido en :SOUR:FUNC? -> {resp}")
-
-    def set_source_value(self, value: float) -> None:
-        mode = self.get_source_mode()
-        if mode == Modes.CURRENT_MODE:
-            self.write(f":SOUR:CURR {value}")
-        elif mode == Modes.VOLTAGE_MODE:
-            self.write(f":SOUR:VOLT {value}")
-        else:
-            raise RuntimeError(f"Modo de fuente no soportado: {mode}")
-
-    def set_compliance(self, limit: float) -> None:
-        mode = self.get_source_mode()
-        if mode == Modes.CURRENT_MODE:
-            # En modo corriente, la compliance es de VOLTAJE (V)
-            self.write(f":SENS:VOLT:PROT {limit}")
-        elif mode == Modes.VOLTAGE_MODE:
-            # En modo tensión, la compliance es de CORRIENTE (A)
-            self.write(f":SENS:CURR:PROT {limit}")
-        else:
-            raise RuntimeError(f"Modo de fuente no soportado: {mode}")
 
     def configure_data_format_elements(self, elements: [str]):
         if not elements:
@@ -97,33 +53,7 @@ class Keithley2400(SourcemeterBase):
         # Construir la cadena SCPI
         formatted = ",".join(f'{el.upper()}' for el in elements)
         command = f":FORM:ELEM {formatted}"
-        self.write(command)
-
-    def set_nplc(self, nplc: float) -> set[str]:
-        funcs = self.get_measure_function()
-        applied: set[str] = set()
-
-        # Aplica a cada función reconocida
-        if "VOLT" in funcs:
-            self.write(f":SENS:VOLT:NPLC {nplc}")
-            applied.add("VOLT")
-        if "CURR" in funcs:
-            self.write(f":SENS:CURR:NPLC {nplc}")
-            applied.add("CURR")
-        if "RES" in funcs:
-            self.write(f":SENS:RES:NPLC {nplc}")
-            applied.add("RES")
-        if "FRES" in funcs:
-            self.write(f":SENS:FRES:NPLC {nplc}")
-            applied.add("FRES")
-
-        if not applied:
-            # Si no hay función activa reconocible, lo indicamos de forma explícita
-            raise RuntimeError(
-                f"No hay función de medida activa reconocible para aplicar NPLC (FUNC?={funcs})"
-            )
-
-        return applied
+        self._port.write(command)
 
     def set_terminals(self, where: str = "FRONT") -> None:
         w = where.strip().lower()
@@ -131,30 +61,16 @@ class Keithley2400(SourcemeterBase):
             raise ValueError("where debe ser 'front' o 'rear'")
         # Opcional: garantizar salida off por seguridad
         try:
-            self.write(":OUTP OFF")
+            self._port.write(":OUTP OFF")
         except Exception:
             pass
-        self.write(f":ROUT:TERM {'FRONT' if w == 'front' else 'REAR'}")
+        self._port.write(f":ROUT:TERM {'FRONT' if w == 'front' else 'REAR'}")
 
 
-    def set_source_range(self, range_or_auto: str = "AUTO") -> str:
-        func = self.get_source_mode()  # 'VOLT' o 'CURR'
-        if isinstance(range_or_auto, str) and range_or_auto.strip().lower() == "auto":
-            self.write(f":SOUR:{func.value}:RANG:AUTO ON")
-            return func
 
-        # Cadenas numéricas también válidas
-        if isinstance(range_or_auto, str):
-            val = float(range_or_auto.strip())
-        else:
-            val = float(range_or_auto)
-
-        self.write(f":SOUR:{func.value}:RANG {val}")
-        self.write(f":SOUR:{func.value}:RANG:AUTO OFF")
-        return func
 
     def enable_remote_sense(self, enable: bool = True) -> None:
-        self.write(f":SYST:RSEN {'ON' if enable else 'OFF'}")
+        self._port.write(f":SYST:RSEN {'ON' if enable else 'OFF'}")
 
 
     # ********* MULTIMETER INTERFACE ****************
@@ -163,7 +79,7 @@ class Keithley2400(SourcemeterBase):
         pass
 
     def measure(self) -> float:
-        response = self.query(":READ?")
+        response = self._port.query(":READ?")
         # TODO: mejorar _measure. puede dar problemas cuando el equipo está formateado para medir varios elementos
         if isinstance(response, list):
             response = float(response.split(',')[1])  # Tomamos el segundo valor si se trata de una list,
@@ -178,7 +94,10 @@ class Keithley2400(SourcemeterBase):
             command = f":SENS:{measure_function}:RANG {_range}"
         else:
             raise ValueError("El valor debe ser un número o 'AUTO'/'A'.")
-        self.write(command)
+        self._port.write(command)
+
+    def get_measure_range(self) -> float:
+        raise NotImplemented
 
     def set_measure_function(self, function: str):
         mode_map = {
@@ -199,14 +118,117 @@ class Keithley2400(SourcemeterBase):
             raise ValueError(f"Modo de medición no válido: {function}. Opciones válidas: {list(mode_map.keys())}")
 
         selected_mode = mode_map[mode_upper]
-        self.write(f":SENS:FUNC \"{selected_mode}\"")
+        self._port.write(f":SENS:FUNC \"{selected_mode}\"")
 
     def get_measure_function(self) -> str:
         valid_functions = {"VOLT", "CURR", "RES"}
-        response = self.query(":SENS:FUNC?")
+        response = self._port.query(":SENS:FUNC?")
         response = response.strip().replace('"', '').upper()
         # Comprobar si alguno de los modos está en la cadena
         if not any(valid_func in response.upper() for valid_func in valid_functions):
             raise RuntimeError(f"Función de medición desconocida o no soportada: {response}")
         return response.split(":")[0]
+
+    def set_nplc(self, nplc: float) -> None:
+        funcs = self.get_measure_function()
+        applied: set[str] = set()
+
+        # Aplica a cada función reconocida
+        if "VOLT" in funcs:
+            self._port.write(f":SENS:VOLT:NPLC {nplc}")
+            applied.add("VOLT")
+        if "CURR" in funcs:
+            self._port.write(f":SENS:CURR:NPLC {nplc}")
+            applied.add("CURR")
+        if "RES" in funcs:
+            self._port.write(f":SENS:RES:NPLC {nplc}")
+            applied.add("RES")
+        if "FRES" in funcs:
+            self._port.write(f":SENS:FRES:NPLC {nplc}")
+            applied.add("FRES")
+
+        if not applied:
+            # Si no hay función activa reconocible, lo indicamos de forma explícita
+            raise RuntimeError(
+                f"No hay función de medida activa reconocible para aplicar NPLC (FUNC?={funcs})"
+            )
+
+    def get_nplc(self) -> float:
+        pass
+
+    # ********* SOURCE INTERFACE ****************
+    def set_source_range(self, range_or_auto: str = "AUTO") -> str:
+        func = self.get_source_mode()  # 'VOLT' o 'CURR'
+        if isinstance(range_or_auto, str) and range_or_auto.strip().lower() == "auto":
+            self._port.write(f":SOUR:{func.value}:RANG:AUTO ON")
+            return func
+
+        # Cadenas numéricas también válidas
+        if isinstance(range_or_auto, str):
+            val = float(range_or_auto.strip())
+        else:
+            val = float(range_or_auto)
+
+        self._port.write(f":SOUR:{func.value}:RANG {val}")
+        self._port.write(f":SOUR:{func.value}:RANG:AUTO OFF")
+        return func
+
+
+    def get_source_range(self) -> float:
+        pass
+
+    def set_source_mode(self, mode: str) -> str:
+        if mode is None:
+            raise ValueError("mode no puede ser None")
+
+        m = mode.strip().lower()
+        if m in ("current", "curr", "i"):
+            self._port.write(":SOUR:FUNC CURR")
+            return "current"
+        if m in ("voltage", "volt", "v"):
+            self._port.write(":SOUR:FUNC VOLT")
+            return "voltage"
+
+        raise ValueError("mode debe ser 'current'/'curr'/'i' o 'voltage'/'volt'/'v'")
+
+    def get_source_mode(self) -> Modes:
+        resp = self._port.query(":SOUR:FUNC?")
+        resp = resp.strip().replace('"', '').upper()
+        if resp.startswith("VOLT"):
+            return Modes.VOLTAGE_MODE
+        if resp.startswith("CURR"):
+            return Modes.CURRENT_MODE
+        raise RuntimeError(f"Modo de fuente desconocido en :SOUR:FUNC? -> {resp}")
+
+    def set_source_value(self, value: float) -> None:
+        mode = self.get_source_mode()
+        if mode == Modes.CURRENT_MODE:
+            self._port.write(f":SOUR:CURR {value}")
+        elif mode == Modes.VOLTAGE_MODE:
+            self._port.write(f":SOUR:VOLT {value}")
+        else:
+            raise RuntimeError(f"Modo de fuente no soportado: {mode}")
+
+    def get_source_value(self) -> float:
+        pass
+
+    def set_compliance(self, limit: float) -> None:
+        mode = self.get_source_mode()
+        if mode == Modes.CURRENT_MODE:
+            # En modo corriente, la compliance es de VOLTAJE (V)
+            self._port.write(f":SENS:VOLT:PROT {limit}")
+        elif mode == Modes.VOLTAGE_MODE:
+            # En modo tensión, la compliance es de CORRIENTE (A)
+            self._port.write(f":SENS:CURR:PROT {limit}")
+        else:
+            raise RuntimeError(f"Modo de fuente no soportado: {mode}")
+
+    def get_compliance(self) -> float:
+        pass
+
+    def get_terminals(self) -> str:
+        pass
+
+    def output(self, on: bool) -> None:
+        self._port.write(f":OUTP {'ON' if on else 'OFF'}")
 
