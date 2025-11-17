@@ -26,7 +26,7 @@ class KeysightE4990A(ImpedanceAnalyzerBase):
         super().__init__(resource)
         self.setup(config)
 
-    def setup(self, config: Dict[str, Any]):
+    def setup(self, settings: Dict[str, Any] = None) -> None:
         """
         Configura el instrumento según los parámetros ya cargados en el init.
         """
@@ -41,10 +41,10 @@ class KeysightE4990A(ImpedanceAnalyzerBase):
         self.write("DISP:WIND1:SPL D1_2_3")
 
         self.write("SENS1:SWE:TYPE LIN")
-        self.write(f"SENS1:FREQ:STAR {config['f_start']}")
-        self.write(f"SENS1:FREQ:STOP {config['f_stop']}")
-        self.write(f"SENS1:SWE:POIN {config['n_points']}")
-        self.write(f"SOUR1:VOLT {config['vac_level']}")
+        self.write(f"SENS1:FREQ:STAR {settings['f_start']}")
+        self.write(f"SENS1:FREQ:STOP {settings['f_stop']}")
+        self.write(f"SENS1:SWE:POIN {settings['n_points']}")
+        self.write(f"SOUR1:VOLT {settings['vac_level']}")
 
         self.write("SOUR:BIAS:STAT OFF")
 

@@ -26,17 +26,17 @@ class Keithley2400(SourcemeterBase):
         super().__init__(resource)
         self.setup(config)
 
-    def setup_sourcemeter(self, config: Dict[str, Any]):
+    def setup(self, settings: Dict[str, Any] = None) -> None:
         """
         Configura el instrumento según los parámetros ya cargados en el init.
         """
-        self.set_source_mode(config["source_mode"])
-        self.set_compliance(config["compliance"])
-        self.set_source_range(config["source_range"])
-        self.set_measure_function(config["measure_function"])
-        self.set_nplc(config["nplc"])
-        self.set_terminals(config["front_rear"])
-        self.enable_remote_sense(config["remote_sense"].lower() == "y")
+        self.set_source_mode(settings["source_mode"])
+        self.set_compliance(settings["compliance"])
+        self.set_source_range(settings["source_range"])
+        self.set_measure_function(settings["measure_function"])
+        self.set_nplc(settings["nplc"])
+        self.set_terminals(settings["front_rear"])
+        self.enable_remote_sense(settings["remote_sense"].lower() == "y")
 
     def output(self, on: bool) -> None:
         self.write(f":OUTP {'ON' if on else 'OFF'}")

@@ -10,7 +10,17 @@ class Modes(Enum):
     AUTO_MODE = 'AUTO'
 
 
-class VisaInstrument(ABC):
+class Instrument(ABC):
+    @abstractmethod
+    def setup(self, settings: Dict[str, Any] = None) -> None:
+        """
+        Configures the Instrument with a dictionary of settings.
+        Each implementation can interpret the settings as needed.
+        """
+        pass
+
+
+class VisaInstrument(Instrument):
     """
     Base genérica para instrumentos SCPI sobre VISA.
     Mantiene un `resource` PyVISA y helpers para SCPI.
@@ -22,23 +32,29 @@ class VisaInstrument(ABC):
         self._res.write_termination = write_termination
 
     # --- Helpers SCPI comunes ---
+    @abstractmethod
     def write(self, cmd: str) -> None:
         self._res.write(cmd)
 
+    @abstractmethod
     def query(self, cmd: str) -> str:
         return self._res.query(cmd)
 
+    @abstractmethod
     def read(self) -> str:
         return self._res.read()
 
     # --- Comandos SCPI estándar ---
+    @abstractmethod
     def idn(self) -> str:
         return self.query("*IDN?").strip()
 
+    @abstractmethod
     def reset(self) -> None:
         self.write("*RST")
         self.write("*CLS")
 
+    @abstractmethod
     def close(self) -> None:
         try:
             self._res.close()
@@ -46,22 +62,16 @@ class VisaInstrument(ABC):
             pass
 
     # Context manager opcional
+    @abstractmethod
     def __enter__(self):
         return self
 
+    @abstractmethod
     def __exit__(self, exc_type, exc, tb):
         self.close()
 
 
-class Multimeter(ABC):
-
-    @abstractmethod
-    def setup_multimeter(self, settings: Dict[str, Any] = None) -> None:
-        """
-        Configures the multimeter with a dictionary of settings.
-        Each implementation can interpret the settings as needed.
-        """
-        pass
+class Multimeter(Instrument):
 
     @abstractmethod
     def measure(self) -> float:
@@ -87,15 +97,8 @@ class Multimeter(ABC):
         """
         pass
 
-class Source(ABC):
 
-    @abstractmethod
-    def setup_source(self, settings: Dict[str, Any] = None) -> None:
-        """
-        Configures the multimeter with a dictionary of settings.
-        Each implementation can interpret the settings as needed.
-        """
-        pass
+class Source(Instrument):
 
     @abstractmethod
     def set_source_range(self, range_or_auto: str = "AUTO") -> str:
@@ -194,7 +197,8 @@ class Source(ABC):
         :return:
         """
 
-class SourcemeterBase(VisaInstrument, Source, Multimeter, ABC):
+
+class SourcemeterBase(VisaInstrument, Source, Multimeter):
     """
     Interfaz abstracta de un SourceMeter (SMU).
     Implementa el contrato común, independientemente del modelo.
@@ -202,7 +206,7 @@ class SourcemeterBase(VisaInstrument, Source, Multimeter, ABC):
     pass
 
 
-class ImpedanceAnalyzerBase(VisaInstrument, ABC):
+class ImpedanceAnalyzerBase(VisaInstrument):
     """
     Interfaz abstracta de un Analizador de Impedancias.
     """
