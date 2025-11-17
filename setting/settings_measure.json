@@ -7,6 +7,10 @@
     "backend_valid_options": ["@ni", "@keysight", "@py", "@sim"]
   },
   "Instruments": {
+    "VisaInstrument": {
+      "read_termination": "\n",
+      "write_termination": "\n"
+    },
     "ImpedanceAnalyzer": {
       "model": "E4990A",
       "gpib_addr": "25",
