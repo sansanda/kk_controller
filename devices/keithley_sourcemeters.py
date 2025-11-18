@@ -1,5 +1,9 @@
 from __future__ import annotations
+
+import atexit
 from typing import Dict, Any
+
+import pyvisa.errors
 
 from devices import Source, Multimeter, InstrumentsPort, Modes
 
@@ -24,8 +28,9 @@ class Keithley2400(Source, Multimeter):
                            "compliance": 10.0
                        }
         """
-        self._port = InstrumentsPort(resource, settings)
+        self._port = InstrumentsPort(resource, settings=None)
         self.setup(settings)
+        atexit.register(self.close)
 
     def setup(self, settings: Dict[str, Any] = None) -> None:
         """
@@ -231,4 +236,13 @@ class Keithley2400(Source, Multimeter):
 
     def output(self, on: bool) -> None:
         self._port.write(f":OUTP {'ON' if on else 'OFF'}")
+
+    def close(self) -> None:
+        print("Apagando y cerrando instrumento 2400...")
+        self.output(False)
+        try:
+            self._port.close()
+        except pyvisa.errors.InvalidSession:
+            print("Puerto ya cerrado")
+
 

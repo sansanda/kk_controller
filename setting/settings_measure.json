@@ -3,17 +3,15 @@
     "timeout_ms": 30000,
     "timeout_ms_min": 0,
     "timeout_ms_max": 30000,
-    "backend": "@ni",
-    "backend_valid_options": ["@ni", "@keysight", "@py", "@sim"]
+    "read_termination": "\n",
+    "write_termination": "\n",
+    "backend": "",
+    "backend_valid_options": ["","@ni", "@keysight", "@py", "@sim"]
   },
   "Instruments": {
-    "VisaInstrument": {
-      "read_termination": "\n",
-      "write_termination": "\n"
-    },
     "ImpedanceAnalyzer": {
       "model": "E4990A",
-      "gpib_addr": "25",
+      "gpib_addr": "GPIB0::25::INSTR",
       "timeout_ms": 10000,
       "f_start": 99.9E+3,
       "f_stop": 100.1E+3,
@@ -22,7 +20,7 @@
     },
     "SourceMeter": {
       "model": "Keithley_2410",
-      "gpib_addr": "30",
+      "gpib_addr": "GPIB0::30::INSTR",
       "timeout_ms": 10000,
       "source_mode": "voltage",
       "source_mode_valid_options": ["voltage", "current"],
@@ -61,7 +59,7 @@
     "selected_delay": "TimeDelay",
     "selected_delay_valid_options": ["TimeDelay", "StatisticsDelay"],
     "time_delay": {
-      "delay_value": 2
+      "delay_value": 0.1
     },
     "statistics_delay": {
       "metric": "st_dev",

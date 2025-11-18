@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from communication.CommunicationPorts import InstrumentsPort
+import atexit
+
+import pyvisa.errors
+
+from communications.CommunicationPorts import InstrumentsPort
 from .base import ImpedanceAnalyzerBase
 from typing import Dict, Any
 
@@ -25,14 +29,14 @@ class KeysightE4990A(ImpedanceAnalyzerBase):
                            "compliance": 10.0
                        }
         """
-        self._port = InstrumentsPort(resource, settings)
+        self._port = InstrumentsPort(resource, None)
         self.setup(settings)
+        atexit.register(self.close)
 
     def setup(self, settings: Dict[str, Any] = None) -> None:
         """
         Configura el instrumento según los parámetros ya cargados en el init.
         """
-
         # Setup point-triggered sweep, Cs/Rs parameters, no DC bias.
         self._port.write("TRIG:SOUR BUS")
         self._port.write("INIT1:CONT ON")
@@ -114,3 +118,11 @@ class KeysightE4990A(ImpedanceAnalyzerBase):
         resp = self._port.query(":FETC?").strip()
         a, b = resp.split(",")[:2]
         return float(a), float(b)
+
+    def close(self):
+        print("Apagando y cerrando instrumento E4990A...")
+        try:
+            self._port.close()
+        except pyvisa.errors.InvalidSession:
+            print("Puerto ya cerrado")
+

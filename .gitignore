@@ -1,6 +1,13 @@
 # Carpetas de bytecode de Python
 __pycache__/
 **/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# PyCharm / IntelliJ
+.idea/
+*.iml
 
 # Archivos compilados
 *.py[cod]

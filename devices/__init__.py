@@ -1,6 +1,6 @@
-#devices.__init__
+# devices.__init__
 
-from communication.CommunicationPorts import InstrumentsPort
+from communications.CommunicationPorts import InstrumentsPort
 from .visa_backend import VisaResourceManager
 from .base import (
     Modes,

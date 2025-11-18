@@ -19,6 +19,8 @@ class Instrument(ABC):
         """
         pass
 
+    @abstractmethod
+    def close(self) -> None: ...
 
 class Multimeter(Instrument):
 
@@ -33,7 +35,7 @@ class Multimeter(Instrument):
         pass
 
     @abstractmethod
-    def get_measure_range(self) -> float:...
+    def get_measure_range(self) -> float: ...
 
     @abstractmethod
     def set_measure_function(self, function: str) -> None:
@@ -63,7 +65,6 @@ class Multimeter(Instrument):
 
         :return:
         """
-
 
 class Source(Instrument):
 

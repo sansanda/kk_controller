@@ -112,6 +112,27 @@ def main():
     # Ejecutar el bucle principal
     main_sdm_loop(sweep_settings, smu, smu, imp_analyzer, delay, file_name)
 
+    # try:
+    #     main_sdm_loop(sweep_settings, smu, smu, imp_analyzer, delay, file_name)
+    # except KeyboardInterrupt:
+    #     print("\n>>> INTERRUPCIÓN DETECTADA (Ctrl+C/PyCharm STOP)")
+    #     print(">>> Apagando instrumentos de forma segura...")
+    #
+    #     try:
+    #         print(">>> Apagando SMU....")
+    #         smu.output(False)
+    #         print(">>> Apagando Imp Analyzer....")
+    #     except:
+    #         pass
+    #
+    # finally:
+    #     print(">>> Limpieza final. Apagando puertos...")
+    #     try:
+    #         print(">>> Limpieza final smu")
+    #         smu.close()
+    #     except:
+    #         pass
+
 
 if __name__ == "__main__":
     main()
