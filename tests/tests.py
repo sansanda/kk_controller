@@ -74,7 +74,6 @@ class TestTimeDelay(unittest.TestCase):
     def test_str_output(self):
         td = TimeDelay(timeout=1, callback=self.callback)
         s = str(td)
-        print(s)
         self.assertIn("TimeDelay(timeout=1.00s", s)
         self.assertIn("state='initiated'", s)
         self.assertIn("callback=callback", s)
@@ -151,7 +150,6 @@ class TestStatisticsDelay(unittest.TestCase):
         sd.start()
         # hay que dar tiempo para que acabe el delay
         time.sleep(3)
-        print(sd.values)
         assert len(sd.values) == 120
         assert sd.values[0] == 30
         assert sd.values[-1] == 149
