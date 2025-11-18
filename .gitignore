@@ -20,3 +20,6 @@ venv/
 # Archivos temporales de IDEs
 .vscode/
 .idea/
+
+# medidas
+./measures
