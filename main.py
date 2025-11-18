@@ -103,7 +103,7 @@ def main():
     # init output file
     # Abrir fichero y escribir cabecera
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    file_name = f"{output_file_settings['File']['name']}_{timestamp}.csv"
+    file_name = f"{output_file_settings['File']['directory']+'/'+output_file_settings['File']['name']}_{timestamp}.csv"
 
     with open(file_name, mode="w", newline='') as csvfile:
         writer = csv.writer(csvfile)

@@ -73,6 +73,7 @@
   },
   "Results": {
     "File": {
+      "directory": "measures",
       "name": "measure",
       "header": "v(V),z(Ohms),phi(º),cs(Farads)"
     }
