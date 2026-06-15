@@ -1,5 +1,5 @@
 
-# KK CONTROLLER  
+# KQ CONTROLLER  
 Programa en python para el control de instrumentos para la caracterización de las capacidades parásitas en dispositivos de potencia:
 
 - Caracterización de las capacidades parásitas versus Drain-Source voltage
